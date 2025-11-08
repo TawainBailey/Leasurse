@@ -1,3 +1,6 @@
+-- Fishing Tab for FishClarity
+-- Smart Detector feature for stuck detection and auto-reset
+---2
 return function(config)
 	local FishingTab = config.FishingTab
 	local Notifier = config.Notifier
@@ -12,6 +15,7 @@ return function(config)
 	local player = Players.LocalPlayer
 	local replion = require(game.ReplicatedStorage.Packages.Replion).Client:WaitReplion("Data")
 	local ItemUtility = require(ReplicatedStorage.Shared.ItemUtility)
+	local TierUtility = require(ReplicatedStorage.Shared.TierUtility)
 
 	-- Controllers
 	local FishingController
@@ -27,6 +31,8 @@ return function(config)
 		:WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):WaitForChild("RE/FishingCompleted")
 	local REEquipToolFromHotbar = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")
 		:WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):WaitForChild("RE/EquipToolFromHotbar")
+	local REFavoriteItem = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")
+		:WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):WaitForChild("RE/FavoriteItem")
 
 	-- Smart Detector variables
 	local smartDetectorEnabled = false
@@ -107,7 +113,6 @@ return function(config)
 	local autoUnfavoriteEnabled = false
 	local favoriteConnection = nil
 	local unfavoriteConnection = nil
-	local REFavoriteItem = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/FavoriteItem"]
 
 	-- Check if rod is equipped
 	local function isRodEquipped()
@@ -723,16 +728,21 @@ return function(config)
 	end
 
 	local function getFishInventory()
-		local inventory = replion:GetValue("Inventory")
-		local fishItems = {}
-		
-		if inventory and inventory.Fish then
-			for _, item in pairs(inventory.Fish) do
-				table.insert(fishItems, item)
+		local inventory = {}
+		if replion then
+			local success, items = pcall(function()
+				return replion:GetExpect({"Inventory", "Items"})
+			end)
+			if success and items then
+				for _, item in ipairs(items) do
+					local itemData = ItemUtility.GetItemDataFromItemType("Items", item.Id)
+					if itemData and itemData.Data and itemData.Data.Type == "Fish" then
+						table.insert(inventory, item)
+					end
+				end
 			end
 		end
-		
-		return fishItems
+		return inventory
 	end
 
 	-- ============================================
@@ -826,56 +836,72 @@ return function(config)
 		local items = getFishInventory()
 		for _, item in ipairs(items) do
 			if item.Favorited then
-				local shouldUnfavorite = false
-				
-				if next(selectedFishNames) ~= nil then
-					for selectedName, isSelected in pairs(selectedFishNames) do
-						if isSelected and item.Name == selectedName then
-							if next(selectedVariant) then
-								for variantName, variantSelected in pairs(selectedVariant) do
-									if variantSelected and item.Variant and item.Variant == variantName then
-										shouldUnfavorite = true
-										break
+				local itemData = ItemUtility.GetItemDataFromItemType("Items", item.Id)
+				if itemData then
+					local fishName = itemData.Data.Name
+					local shouldUnfavorite = false
+					
+					if next(selectedFishNames) ~= nil then
+						for selectedName, isSelected in pairs(selectedFishNames) do
+							if isSelected and fishName == selectedName then
+								if next(selectedVariant) then
+									for variantName, variantSelected in pairs(selectedVariant) do
+										if variantSelected and item.Metadata and item.Metadata.VariantId == variantName then
+											shouldUnfavorite = true
+											break
+										end
+									end
+								end
+								if next(selectedRarity) then
+									local fishTier = itemData.Data.Tier
+									if fishTier then
+										local tierInfo = TierUtility:GetTier(fishTier)
+										if tierInfo then
+											for rarityName, raritySelected in pairs(selectedRarity) do
+												if raritySelected and tierInfo.Name == rarityName then
+													shouldUnfavorite = true
+													break
+												end
+											end
+										end
+									end
+								end
+								if not next(selectedVariant) and not next(selectedRarity) then
+									shouldUnfavorite = true
+								end
+							end
+						end
+					end
+					
+					if next(selectedVariant) or next(selectedRarity) then
+						if next(selectedVariant) then
+							for variantName, variantSelected in pairs(selectedVariant) do
+								if variantSelected and item.Metadata and item.Metadata.VariantId == variantName then
+									shouldUnfavorite = true
+									break
+								end
+							end
+						end
+						if next(selectedRarity) then
+							local fishTier = itemData.Data.Tier
+							if fishTier then
+								local tierInfo = TierUtility:GetTier(fishTier)
+								if tierInfo then
+									for rarityName, raritySelected in pairs(selectedRarity) do
+										if raritySelected and tierInfo.Name == rarityName then
+											shouldUnfavorite = true
+											break
+										end
 									end
 								end
 							end
-							if next(selectedRarity) then
-								for rarityName, raritySelected in pairs(selectedRarity) do
-									if raritySelected and item.Rarity and item.Rarity == rarityName then
-										shouldUnfavorite = true
-										break
-									end
-								end
-							end
-							if not next(selectedVariant) and not next(selectedRarity) then
-								shouldUnfavorite = true
-							end
 						end
 					end
-				end
-				
-				if next(selectedVariant) or next(selectedRarity) then
-					if next(selectedVariant) then
-						for variantName, variantSelected in pairs(selectedVariant) do
-							if variantSelected and item.Variant and item.Variant == variantName then
-								shouldUnfavorite = true
-								break
-							end
-						end
+					
+					if shouldUnfavorite then
+						favoriteFish(item.UUID)
+						task.wait(0.05)
 					end
-					if next(selectedRarity) then
-						for rarityName, raritySelected in pairs(selectedRarity) do
-							if raritySelected and item.Rarity and item.Rarity == rarityName then
-								shouldUnfavorite = true
-								break
-							end
-						end
-					end
-				end
-				
-				if shouldUnfavorite then
-					favoriteFish(item.UUID)
-					task.wait(0.05)
 				end
 			end
 		end
@@ -885,58 +911,96 @@ return function(config)
 		if not autoFavoriteEnabled then return end
 		
 		local items = getFishInventory()
+		
 		for _, item in ipairs(items) do
 			if not item.Favorited then
-				local shouldFavorite = false
-				
-				if next(selectedFishNames) ~= nil then
-					for selectedName, isSelected in pairs(selectedFishNames) do
-						if isSelected and item.Name == selectedName then
+				local itemData = ItemUtility.GetItemDataFromItemType("Items", item.Id)
+				if itemData then
+					local fishName = itemData.Data.Name
+					local shouldFavorite = false
+					
+					if next(selectedFishNames) ~= nil then
+						for selectedName, isSelected in pairs(selectedFishNames) do
+							if isSelected and fishName == selectedName then
+								shouldFavorite = true
+								
+								if next(selectedVariant) then
+									local variantMatch = false
+									for variantName, variantSelected in pairs(selectedVariant) do
+										if variantSelected and item.Metadata and item.Metadata.VariantId == variantName then
+											variantMatch = true
+											break
+										end
+									end
+									if not variantMatch then
+										shouldFavorite = false
+									end
+								end
+								
+								if next(selectedRarity) then
+									local rarityMatch = false
+									local fishTier = itemData.Data.Tier
+									if fishTier then
+										local tierInfo = TierUtility:GetTier(fishTier)
+										if tierInfo then
+											for rarityName, raritySelected in pairs(selectedRarity) do
+												if raritySelected and tierInfo.Name == rarityName then
+													rarityMatch = true
+													break
+												end
+											end
+										end
+									end
+									if not rarityMatch then
+										shouldFavorite = false
+									end
+								end
+								
+								break
+							end
+						end
+					else
+						if next(selectedVariant) or next(selectedRarity) then
+							shouldFavorite = true
+							
 							if next(selectedVariant) then
+								local variantMatch = false
 								for variantName, variantSelected in pairs(selectedVariant) do
-									if variantSelected and item.Variant and item.Variant == variantName then
-										shouldFavorite = true
+									if variantSelected and item.Metadata and item.Metadata.VariantId == variantName then
+										variantMatch = true
 										break
 									end
 								end
+								if not variantMatch then
+									shouldFavorite = false
+								end
 							end
+							
 							if next(selectedRarity) then
-								for rarityName, raritySelected in pairs(selectedRarity) do
-									if raritySelected and item.Rarity and item.Rarity == rarityName then
-										shouldFavorite = true
-										break
+								local rarityMatch = false
+								local fishTier = itemData.Data.Tier
+								if fishTier then
+									local tierInfo = TierUtility:GetTier(fishTier)
+									if tierInfo then
+										for rarityName, raritySelected in pairs(selectedRarity) do
+											if raritySelected and tierInfo.Name == rarityName then
+												rarityMatch = true
+												break
+											end
+										end
 									end
 								end
-							end
-							if not next(selectedVariant) and not next(selectedRarity) then
-								shouldFavorite = true
-							end
-						end
-					end
-				end
-				
-				if next(selectedVariant) or next(selectedRarity) then
-					if next(selectedVariant) then
-						for variantName, variantSelected in pairs(selectedVariant) do
-							if variantSelected and item.Variant and item.Variant == variantName then
-								shouldFavorite = true
-								break
+								if not rarityMatch then
+									shouldFavorite = false
+								end
 							end
 						end
 					end
-					if next(selectedRarity) then
-						for rarityName, raritySelected in pairs(selectedRarity) do
-							if raritySelected and item.Rarity and item.Rarity == rarityName then
-								shouldFavorite = true
-								break
-							end
-						end
+					
+					if shouldFavorite then
+						favoriteFish(item.UUID)
+						task.wait(0.05)
 					end
-				end
-				
-				if shouldFavorite then
-					favoriteFish(item.UUID)
-					task.wait(0.05)
 				end
 			end
 		end
@@ -1351,7 +1415,7 @@ return function(config)
 		Callback = function()
 			selectedFishNames = {}
 			if FishNamesDropdown and FishNamesDropdown.ClearSelection then
-				FishNamesDropdown:ClearSelection()
+				FishNamesDropdown.ClearSelection()
 			end
 			Notifier.new({
 				Title = "Cleared",
@@ -1476,4 +1540,287 @@ return function(config)
 			unfavoriteAllFish()
 		end,
 	});
+
+	-- Favorite Functions
+	local function getFishInventory()
+		local inventory = {}
+		if replion then
+			local success, items = pcall(function()
+				return replion:GetExpect({"Inventory", "Items"})
+			end)
+			if success and items then
+				for _, item in ipairs(items) do
+					local itemData = ItemUtility.GetItemDataFromItemType("Items", item.Id)
+					if itemData and itemData.Data and itemData.Data.Type == "Fish" then
+						table.insert(inventory, item)
+					end
+				end
+			end
+		end
+		return inventory
+	end
+
+	local function favoriteFish(uuid)
+		pcall(function()
+			REFavoriteItem:FireServer(uuid)
+		end)
+	end
+
+	local function unfavoriteAllFish()
+		local items = getFishInventory()
+		local unfavoriteCount = 0
+		
+		for _, item in ipairs(items) do
+			if item.Favorited then
+				favoriteFish(item.UUID)
+				unfavoriteCount = unfavoriteCount + 1
+				task.wait(0.05)
+			end
+		end
+		
+		Notifier.new({
+			Title = "Unfavorite All",
+			Content = "Unfavorited " .. unfavoriteCount .. " fish",
+			Duration = 3,
+			Icon = "rbxassetid://95448792622941"
+		})
+	end
+
+	local function autoUnfavoriteFish()
+		if not autoUnfavoriteEnabled then return end
+		
+		local items = getFishInventory()
+		
+		for _, item in ipairs(items) do
+			if item.Favorited then
+				local itemData = ItemUtility.GetItemDataFromItemType("Items", item.Id)
+				if itemData then
+					local fishName = itemData.Data.Name
+					local shouldUnfavorite = false
+					
+					if next(selectedFishNames) ~= nil then
+						for selectedName, isSelected in pairs(selectedFishNames) do
+							if isSelected and fishName == selectedName then
+								shouldUnfavorite = true
+								
+								if next(selectedVariant) then
+									local variantMatch = false
+									for variantName, variantSelected in pairs(selectedVariant) do
+										if variantSelected and item.Metadata and item.Metadata.VariantId == variantName then
+											variantMatch = true
+											break
+										end
+									end
+									if not variantMatch then
+										shouldUnfavorite = false
+									end
+								end
+								
+								if next(selectedRarity) then
+									local rarityMatch = false
+									local fishTier = itemData.Data.Tier
+									if fishTier then
+										local tierInfo = TierUtility:GetTier(fishTier)
+										if tierInfo then
+											for rarityName, raritySelected in pairs(selectedRarity) do
+												if raritySelected and tierInfo.Name == rarityName then
+													rarityMatch = true
+													break
+												end
+											end
+										end
+									end
+									if not rarityMatch then
+										shouldUnfavorite = false
+									end
+								end
+								
+								break
+							end
+						end
+					else
+						if next(selectedVariant) or next(selectedRarity) then
+							shouldUnfavorite = true
+							
+							if next(selectedVariant) then
+								local variantMatch = false
+								for variantName, variantSelected in pairs(selectedVariant) do
+									if variantSelected and item.Metadata and item.Metadata.VariantId == variantName then
+										variantMatch = true
+										break
+									end
+								end
+								if not variantMatch then
+									shouldUnfavorite = false
+								end
+							end
+							
+							if next(selectedRarity) then
+								local rarityMatch = false
+								local fishTier = itemData.Data.Tier
+								if fishTier then
+									local tierInfo = TierUtility:GetTier(fishTier)
+									if tierInfo then
+										for rarityName, raritySelected in pairs(selectedRarity) do
+											if raritySelected and tierInfo.Name == rarityName then
+												rarityMatch = true
+												break
+											end
+										end
+									end
+								end
+								if not rarityMatch then
+									shouldUnfavorite = false
+								end
+							end
+						end
+					end
+					
+					if shouldUnfavorite then
+						favoriteFish(item.UUID)
+						task.wait(0.05)
+					end
+				end
+			end
+		end
+	end
+
+	local function autoFavoriteFish()
+		if not autoFavoriteEnabled then return end
+		
+		local items = getFishInventory()
+		
+		for _, item in ipairs(items) do
+			if not item.Favorited then
+				local itemData = ItemUtility.GetItemDataFromItemType("Items", item.Id)
+				if itemData then
+					local fishName = itemData.Data.Name
+					local shouldFavorite = false
+					
+					if next(selectedFishNames) ~= nil then
+						for selectedName, isSelected in pairs(selectedFishNames) do
+							if isSelected and fishName == selectedName then
+								shouldFavorite = true
+								
+								if next(selectedVariant) then
+									local variantMatch = false
+									for variantName, variantSelected in pairs(selectedVariant) do
+										if variantSelected and item.Metadata and item.Metadata.VariantId == variantName then
+											variantMatch = true
+											break
+										end
+									end
+									if not variantMatch then
+										shouldFavorite = false
+									end
+								end
+								
+								if next(selectedRarity) then
+									local rarityMatch = false
+									local fishTier = itemData.Data.Tier
+									if fishTier then
+										local tierInfo = TierUtility:GetTier(fishTier)
+										if tierInfo then
+											for rarityName, raritySelected in pairs(selectedRarity) do
+												if raritySelected and tierInfo.Name == rarityName then
+													rarityMatch = true
+													break
+												end
+											end
+										end
+									end
+									if not rarityMatch then
+										shouldFavorite = false
+									end
+								end
+								
+								break
+							end
+						end
+					else
+						if next(selectedVariant) or next(selectedRarity) then
+							shouldFavorite = true
+							
+							if next(selectedVariant) then
+								local variantMatch = false
+								for variantName, variantSelected in pairs(selectedVariant) do
+									if variantSelected and item.Metadata and item.Metadata.VariantId == variantName then
+										variantMatch = true
+										break
+									end
+								end
+								if not variantMatch then
+									shouldFavorite = false
+								end
+							end
+							
+							if next(selectedRarity) then
+								local rarityMatch = false
+								local fishTier = itemData.Data.Tier
+								if fishTier then
+									local tierInfo = TierUtility:GetTier(fishTier)
+									if tierInfo then
+										for rarityName, raritySelected in pairs(selectedRarity) do
+											if raritySelected and tierInfo.Name == rarityName then
+												rarityMatch = true
+												break
+											end
+										end
+									end
+								end
+								if not rarityMatch then
+									shouldFavorite = false
+								end
+							end
+						end
+					end
+					
+					if shouldFavorite then
+						favoriteFish(item.UUID)
+						task.wait(0.05)
+					end
+				end
+			end
+		end
+	end
+
+	local function startAutoFavorite()
+		if favoriteConnection then
+			favoriteConnection:Disconnect()
+		end
+		
+		favoriteConnection = RunService.Heartbeat:Connect(function()
+			if autoFavoriteEnabled then
+				autoFavoriteFish()
+				task.wait(1)
+			end
+		end)
+	end
+
+	local function stopAutoFavorite()
+		if favoriteConnection then
+			favoriteConnection:Disconnect()
+			favoriteConnection = nil
+		end
+	end
+
+	local function startAutoUnfavorite()
+		if unfavoriteConnection then
+			unfavoriteConnection:Disconnect()
+		end
+		
+		unfavoriteConnection = RunService.Heartbeat:Connect(function()
+			if autoUnfavoriteEnabled then
+				autoUnfavoriteFish()
+				task.wait(1)
+			end
+		end)
+	end
+
+	local function stopAutoUnfavorite()
+		if unfavoriteConnection then
+			unfavoriteConnection:Disconnect()
+			unfavoriteConnection = nil
+		end
+	end
 end
