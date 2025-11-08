@@ -215,13 +215,12 @@ return function(config)
 		-- Status monitoring loop
 		task.spawn(function()
 			local lastMinigameTime = nil
-			local isCasting = false
-			local lastPowerCheck = 0
 
 			while smartDetectorEnabled do
 				pcall(function()
 					if not isRodEquipped() then
 						currentStatus = "No Rod"
+						updateDisplays()
 						task.wait(1)
 						return
 					end
@@ -230,7 +229,7 @@ return function(config)
 
 					if currentMinigameActive then
 						currentStatus = "Minigame"
-						isCasting = false
+						updateDisplays()
 
 						if not lastMinigameTime then
 							lastMinigameTime = tick()
@@ -262,6 +261,7 @@ return function(config)
 
 								task.wait(1)
 								currentStatus = "Active"
+								updateDisplays()
 							end
 						end
 					else
@@ -269,42 +269,27 @@ return function(config)
 							lastMinigameTime = nil
 						end
 
-						-- Check if casting (only when power is actively building)
-						local now = tick()
-						if now - lastPowerCheck >= 0.1 then
-							lastPowerCheck = now
+						-- Simple status detection: if rod equipped and not in minigame, check if casting
+						if FishingController._getPower then
+							local currentPower = FishingController:_getPower()
 
-							if FishingController._getPower then
-								local currentPower = FishingController:_getPower()
-								local isPowerBuilding = false
-
-								-- Check if power is increasing (actually casting)
-								if currentPower > 0.01 then
-									task.wait(0.05)
-									local nextPower = FishingController:_getPower()
-									isPowerBuilding = nextPower > currentPower
-								end
-
-								if isPowerBuilding then
-									if not isCasting then
-										isCasting = true
-										currentStatus = "Casting"
-									end
-								else
-									if isCasting then
-										isCasting = false
-										currentStatus = "Idle"
-									end
-								end
+							-- If power is above 0, player is actively casting
+							if currentPower > 0 then
+								currentStatus = "Casting"
 							else
+								-- Rod equipped, not in minigame, power is 0 = Idle
 								currentStatus = "Idle"
-								isCasting = false
 							end
+						else
+							-- Fallback: if we can't check power, assume Idle when rod is equipped
+							currentStatus = "Idle"
 						end
+
+						updateDisplays()
 					end
 				end)
 
-				task.wait(0.05) -- More frequent checks for better status detection
+				task.wait(0.1) -- Check every 0.1 seconds for responsive status updates
 			end
 		end)
 
