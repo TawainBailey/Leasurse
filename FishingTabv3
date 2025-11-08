@@ -1,4 +1,4 @@
--- Fishing Tab for FishClarityv5
+-- Fishing Tab for FishClarity
 -- Smart Detector feature for stuck detection and auto-reset
 
 return function(config)
