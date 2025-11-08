@@ -1,3 +1,6 @@
+-- Fishing Tab for FishClarity
+-- Smart Detector feature for stuck detection and auto-reset
+
 return function(config)
 	local FishingTab = config.FishingTab
 	local Notifier = config.Notifier
@@ -242,33 +245,36 @@ return function(config)
 						task.wait(0.1)
 						local checkPower = FishingController:_getPower()
 
-						if checkPower <= initialPower + 0.01 then
+						-- Less strict check for power charging - allow small increases
+						if checkPower <= initialPower + 0.05 then
 							task.wait(0.5)
 							return
 						end
 
 						-- Smart power timing with cooldown awareness and ping compensation
-						local lastPower = 0
-						local powerIncreasing = true
 						local ping = game:GetService("Stats"):GetStat("Data Ping")
 						local pingCompensation = math.min(ping / 1000 * 2, 0.1) -- Max 100ms compensation
 						local optimalCastTime = workspace:GetServerTimeNow() + 0.14 + pingCompensation -- Account for cooldown + ping
 						
 						local attempts = 0
+						local lastPower = 0
+						local powerIncreasing = true
+						
 						repeat
 							task.wait(0.005) -- More frequent checks for precision
 							local currentPower = FishingController:_getPower()
 							
 							if currentPower < lastPower then
-								powerIncreasing = false -- Peak detected
+								powerIncreasing = false -- Peak detected, power is dropping
 							end
 							
-							-- Cast when: power is high AND we'll be off cooldown, or emergency cast if timing is critical
+							-- Cast when: power is high enough OR we've reached optimal timing
 							local timeUntilCastReady = optimalCastTime - workspace:GetServerTimeNow()
-							local shouldCast = (currentPower >= 0.95 and not powerIncreasing) or 
-											  (timeUntilCastReady <= 0 and currentPower >= 0.8)
+							local shouldCastNow = currentPower >= 0.95 or 
+												(timeUntilCastReady <= 0 and currentPower >= 0.8) or
+												(not powerIncreasing and currentPower >= 0.85) -- Cast at peak
 							
-							if shouldCast then
+							if shouldCastNow then
 								break
 							end
 							
