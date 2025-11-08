@@ -1,3 +1,6 @@
+-- Fishing Tab for FishClarity
+-- Smart Detector feature for stuck detection and auto-reset
+
 return function(config)
 	local FishingTab = config.FishingTab
 	local Notifier = config.Notifier
@@ -31,6 +34,7 @@ return function(config)
 	-- Smart Detector variables
 	local smartDetectorEnabled = false
 	local originalPosition = nil
+	local originalCFrame = nil  -- Store full CFrame for rotation preservation
 	local lastCastPosition = nil
 	local detectorTimer = 0
 	local waitTime = 15 -- default 15 seconds
@@ -281,22 +285,8 @@ return function(config)
 									end)
 								end
 
-								-- Small delay to let animation start
-								task.wait(0.1)
-
 								FishingController:UpdateChargeState(nil)
 								local success, fishData = FishingController:SendFishingRequestToServer(screenCenter, power)
-
-								if not success then
-									-- Cast failed, stop animation and skip this attempt
-									if AnimationController then
-										pcall(function()
-											AnimationController:DestroyActiveAnimationTracks()
-										end)
-									end
-									return -- Don't proceed, try again next loop
-								end
-
 								if success and fishData then
 									task.wait(0.3)
 									FishingController:FishingRodStarted(fishData)
@@ -484,6 +474,7 @@ return function(config)
 		
 		detectorTimer = 0
 		originalPosition = nil
+		originalCFrame = nil
 		lastCastPosition = nil
 		currentStatus = "Inactive"
 		initialFishCount = 0
@@ -527,12 +518,15 @@ return function(config)
 		fishCaughtSinceStart = 0
 		lastResetTime = 0
 		originalPosition = nil
+		originalCFrame = nil
 		lastCastPosition = nil
 		currentStatus = isRodEquipped() and "Active" or "No Rod"
 
-		-- Save original position
+		-- Save original position and rotation
 		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-			originalPosition = player.Character.HumanoidRootPart.Position
+			local hrp = player.Character.HumanoidRootPart
+			originalPosition = hrp.Position  -- Keep as Vector3 for distance calculations
+			originalCFrame = hrp.CFrame     -- Store full CFrame for rotation preservation
 			lastCastPosition = originalPosition
 		end
 
@@ -624,53 +618,88 @@ return function(config)
 						pcall(function() finishRemote:FireServer() end)
 						lastMinigameTime = nil
 
-						-- Check if minigame actually completed and fish was caught
-						task.wait(0.5)
-						
-						-- First check if minigame is still active (stuck detection)
-						local minigameStillActive = FishingController:GetCurrentGUID() ~= nil
-						
-						if minigameStillActive then
-							-- Minigame completion failed, trigger stuck recovery
-							if (tick() - lastResetTime) >= RESET_COOLDOWN then
+						-- Check if fish was caught and handle stuck recovery
+						task.spawn(function()
+							task.wait(0.5)
+							local currentTime = tick()
+							
+							-- Check if minigame is still active (stuck)
+							if FishingController:GetCurrentGUID() ~= nil and smartDetectorEnabled and (currentTime - lastResetTime) >= RESET_COOLDOWN then
+								print("Minigame stuck detected! Resetting character...")
+								lastResetTime = currentTime
+								local wasEnabled = smartDetectorEnabled
+								smartDetectorEnabled = false
+
 								Notifier.new({
 									Title = "Smart Detector",
-									Content = "Minigame stuck after completion attempt - resetting character",
+									Content = "Minigame stuck detected - resetting character...",
 									Duration = 3,
 									Icon = "rbxassetid://95448792622941"
 								})
-								resetCharacter()
-								detectorTimer = 0
-							end
-						else
-							-- Minigame completed, check if fish was caught
-							local newFishCount = getTotalFishCount()
-							if newFishCount > initialFishCount then
-								-- Fish was caught, reset timer
-								detectorTimer = 0
-								fishCaughtSinceStart = newFishCount - initialFishCount
-								currentStatus = "Fish Caught"
-								updateDisplays()
 
-								Notifier.new({
-									Title = "Smart Detector",
-									Content = "Fish completed - timer reset",
-									Duration = 2,
-									Icon = "rbxassetid://95448792622941"
-								})
+								pcall(function()
+									if player.Character then player.Character:BreakJoints() end
+								end)
 
-								task.wait(1)
-								currentStatus = "Active"
-								updateDisplays()
+								print("Character reset initiated")
+								task.wait(5)
+
+								if wasEnabled then
+									if originalCFrame and player.Character then
+										local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+										if hrp then
+											print("Teleporting to original position with rotation:", originalCFrame.Position, originalCFrame.LookVector)
+											hrp.CFrame = originalCFrame
+											task.wait(0.5)
+										end
+									end
+
+									print("Re-equipping rod...")
+									pcall(function() REEquipToolFromHotbar:FireServer(1) end)
+									task.wait(2)
+
+									if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+										local hrp = player.Character.HumanoidRootPart
+										originalPosition = hrp.Position
+										originalCFrame = hrp.CFrame
+										lastCastPosition = originalPosition
+										print("Position and rotation updated after reset")
+									end
+
+									Notifier.new({
+										Title = "Smart Detector",
+										Content = "Stuck recovery completed - restarting detector",
+										Duration = 3,
+										Icon = "rbxassetid://95448792622941"
+									})
+
+									print("Stuck recovery completed - restarting smart detector")
+									task.wait(1)
+									startSmartDetector()
+								end
 							else
-								-- No fish caught but minigame ended (maybe missed or rare fish)
-								currentStatus = "Minigame Ended"
-								updateDisplays()
-								task.wait(1)
-								currentStatus = "Active"
-								updateDisplays()
+								-- Check if fish was caught normally
+								local newFishCount = getTotalFishCount()
+								if newFishCount > initialFishCount then
+									-- Fish was caught, reset timer
+									detectorTimer = 0
+									fishCaughtSinceStart = newFishCount - initialFishCount
+									currentStatus = "Fish Caught"
+									updateDisplays()
+
+									Notifier.new({
+										Title = "Smart Detector",
+										Content = "Fish completed - timer reset",
+										Duration = 2,
+										Icon = "rbxassetid://95448792622941"
+									})
+
+									task.wait(1)
+									currentStatus = "Active"
+									updateDisplays()
+								end
 							end
-						end
+						end)
 					end
 				else
 					if lastMinigameTime then
