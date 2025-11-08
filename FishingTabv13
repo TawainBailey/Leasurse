@@ -1,4 +1,4 @@
--- Fishing Tab
+-- 555
 return function(config)
 	local FishingTab = config.FishingTab
 	local Notifier = config.Notifier
@@ -186,129 +186,131 @@ return function(config)
 			return
 		end
 
-		if not isRodEquipped() then
-			Notifier.new({
-				Title = "Error",
-				Content = "No fishing rod equipped!",
-				Duration = 3,
-				Icon = "rbxassetid://95448792622941"
-			})
-			return
-		end
-
 		if legitAutoFishEnabled then return end
 		legitAutoFishEnabled = true
 
-		-- Minigame monitoring
+		-- Start monitoring for rod equip and fishing
 		task.spawn(function()
-			local minigameStartTime = nil
-
 			while legitAutoFishEnabled do
-				pcall(function()
-					if not isRodEquipped() then
-						task.wait(1)
-						return
-					end
+				if isRodEquipped() then
+					-- Rod is equipped, start the actual fishing loop
+					local fishingActive = false
 
-					local currentMinigameActive = FishingController:GetCurrentGUID() ~= nil
+					-- Minigame monitoring
+					local minigameStartTime = nil
 
-					if currentMinigameActive then
-						if not minigameStartTime then
-							minigameStartTime = tick()
-						end
+					while legitAutoFishEnabled and isRodEquipped() do
+						pcall(function()
+							local currentMinigameActive = FishingController:GetCurrentGUID() ~= nil
 
-						local elapsed = tick() - minigameStartTime
-
-						if legitDelay > 0 and elapsed >= legitDelay then  -- Only fire remote if legitDelay > 0
-							pcall(function() finishRemote:FireServer() end)
-							minigameStartTime = nil
-							-- Stop all animations and let game handle idle naturally during wait
-							if AnimationController then
-								pcall(function()
-									AnimationController:DestroyActiveAnimationTracks()
-								end)
-							end
-							-- Add 1.30 second wait after finishing minigame before starting next fishing cycle
-							task.wait(1.30)
-						else
-							if elapsed >= manipulationDelay then
-								pcall(function() FishingController:FishingMinigameClick() end)
-							end
-							task.wait(0.1)
-						end
-					else
-						minigameStartTime = nil
-						task.wait(0.02)
-					end
-				end)
-			end
-		end)
-
-		-- Main casting loop
-		legitFishingLoop = task.spawn(function()
-			while legitAutoFishEnabled do
-				pcall(function()
-					if not isRodEquipped() then
-						task.wait(1)
-						return
-					end
-
-					if not FishingController:GetCurrentGUID() then
-						local camera = workspace.CurrentCamera
-						local screenCenter = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
-
-						FishingController:RequestChargeFishingRod(screenCenter, false)
-						task.wait(0.1)
-
-						local initialPower = FishingController:_getPower()
-						task.wait(0.1)
-						local checkPower = FishingController:_getPower()
-
-						-- Less strict check for power charging - allow small increases
-						if checkPower <= initialPower + 0.01 then
-							task.wait(0.5)
-							return
-						end
-
-						local attempts = 0
-						repeat
-							task.wait(0.02)
-							local currentPower = FishingController:_getPower()
-							attempts += 1
-						until currentPower >= 0.92 or attempts >= 80 or not legitAutoFishEnabled
-
-						if legitAutoFishEnabled and FishingController:_getPower() >= 0.5 then
-							pcall(function()
-								local power = FishingController:_getPower()
-
-								-- Sync throw animation with cast timing to prevent desync
-								if AnimationController then
-									pcall(function()
-										AnimationController:DestroyActiveAnimationTracks()
-										AnimationController:PlayAnimation("RodThrow")
-									end)
+							if currentMinigameActive then
+								if not minigameStartTime then
+									minigameStartTime = tick()
 								end
 
-								-- Execute cast immediately after animation starts
-								FishingController:UpdateChargeState(nil)
-								local success, fishData = FishingController:SendFishingRequestToServer(screenCenter, power)
-								if success and fishData then
-									task.wait(0.3)
-									FishingController:FishingRodStarted(fishData)
+								local elapsed = tick() - minigameStartTime
+
+								if legitDelay > 0 and elapsed >= legitDelay then  -- Only fire remote if legitDelay > 0
+									pcall(function() finishRemote:FireServer() end)
+									minigameStartTime = nil
+									-- Stop all animations and let game handle idle naturally during wait
+									if AnimationController then
+										pcall(function()
+											AnimationController:DestroyActiveAnimationTracks()
+										end)
+									end
+									-- Add 1.30 second wait after finishing minigame before starting next fishing cycle
+									task.wait(1.30)
+								else
+									if elapsed >= manipulationDelay then
+										pcall(function() FishingController:FishingMinigameClick() end)
+									end
+									task.wait(0.1)
+								end
+							else
+								minigameStartTime = nil
+								task.wait(0.02)
+							end
+						end)
+					end
+
+					-- Main casting loop
+					legitFishingLoop = task.spawn(function()
+						while legitAutoFishEnabled and isRodEquipped() do
+							pcall(function()
+								if not FishingController:GetCurrentGUID() then
+									local camera = workspace.CurrentCamera
+									local screenCenter = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
+
+									FishingController:RequestChargeFishingRod(screenCenter, false)
+									task.wait(0.1)
+
+									local initialPower = FishingController:_getPower()
+									task.wait(0.1)
+									local checkPower = FishingController:_getPower()
+
+									-- Less strict check for power charging - allow small increases
+									if checkPower <= initialPower + 0.01 then
+										task.wait(0.5)
+										return
+									end
+
+									local attempts = 0
+									repeat
+										task.wait(0.02)
+										local currentPower = FishingController:_getPower()
+										attempts += 1
+									until currentPower >= 0.92 or attempts >= 80 or not legitAutoFishEnabled
+
+									if legitAutoFishEnabled and FishingController:_getPower() >= 0.5 then
+										pcall(function()
+											local power = FishingController:_getPower()
+
+											-- Sync throw animation with cast timing to prevent desync
+											if AnimationController then
+												pcall(function()
+													AnimationController:DestroyActiveAnimationTracks()
+													AnimationController:PlayAnimation("RodThrow")
+												end)
+											end
+
+											-- Execute cast immediately after animation starts
+											FishingController:UpdateChargeState(nil)
+											local success, fishData = FishingController:SendFishingRequestToServer(screenCenter, power)
+											if success and fishData then
+												task.wait(0.3)
+												FishingController:FishingRodStarted(fishData)
+											end
+										end)
+									end
+									-- Dynamic cooldown detection with ping compensation
+									local ping = game:GetService("Stats"):GetStat("Data Ping")
+									local pingCompensation = math.min(ping / 1000 * 2, 0.1) -- Max 100ms compensation
+									local cooldownEndTime = workspace:GetServerTimeNow() + 0.14 + pingCompensation -- 0.14s cooldown + ping buffer
+									while workspace:GetServerTimeNow() < cooldownEndTime and legitAutoFishEnabled do
+										task.wait(0.01)
+									end
+								else
+									task.wait(0.1)
 								end
 							end)
 						end
-						-- Dynamic cooldown detection with ping compensation
-						local ping = game:GetService("Stats"):GetStat("Data Ping")
-						local pingCompensation = math.min(ping / 1000 * 2, 0.1) -- Max 100ms compensation
-						local cooldownEndTime = workspace:GetServerTimeNow() + 0.14 + pingCompensation -- 0.14s cooldown + ping buffer
-						while workspace:GetServerTimeNow() < cooldownEndTime and legitAutoFishEnabled do
-							task.wait(0.01)
-						end
-					else
-						task.wait(0.1)
+					end)
+
+					-- Wait for rod to be unequipped or legit fish to be disabled
+					while legitAutoFishEnabled and isRodEquipped() do
+						task.wait(0.5)
 					end
-				end)
+
+					-- Clean up fishing loop when rod is unequipped
+					if legitFishingLoop then
+						task.cancel(legitFishingLoop)
+						legitFishingLoop = nil
+					end
+				else
+					-- Rod not equipped, wait and check again
+					task.wait(0.5)
+				end
 			end
 		end)
 	end
@@ -1040,7 +1042,7 @@ return function(config)
 				StartLegitAutoFish()
 				Notifier.new({
 					Title = "Legit Auto Fish",
-					Content = "Legit auto fish enabled",
+					Content = "Legit auto fish enabled - waiting for rod",
 					Duration = 3,
 					Icon = "rbxassetid://95448792622941"
 				});
