@@ -1,7 +1,3 @@
--- Shop Container (Automatically Tab)
--- This file contains all UI elements for the Shop/Automatically tab
--- Includes: Merchant, Save Position, Fishing Rods, Baits, Utilities
-
 return function(config)
 	-- Extract dependencies
 	local ShopTab = config.ShopTab
