@@ -1,5 +1,3 @@
--- Fishing Tab for FishClarity
--- Smart Detector feature for stuck detection and auto-reset
 
 return function(config)
 	local FishingTab = config.FishingTab
@@ -187,13 +185,6 @@ return function(config)
 		if legitAutoFishEnabled then return end
 		legitAutoFishEnabled = true
 
-		Notifier.new({
-			Title = "Auto Fish",
-			Content = "Started",
-			Duration = 2,
-			Icon = "rbxassetid://95448792622941"
-		})
-
 		-- Minigame monitoring
 		task.spawn(function()
 			local minigameStartTime = nil
@@ -258,21 +249,12 @@ return function(config)
 						end
 
 						local attempts = 0
-						local previousPower = 0
-						local increasing = true
 						
 						repeat
 							task.wait(0.01)
 							local currentPower = FishingController:_getPower()
 							attempts += 1
-							
-							-- Detect when power starts decreasing (peak reached)
-							if currentPower < previousPower then
-								increasing = false
-							end
-							
-							previousPower = currentPower
-						until (not increasing and currentPower >= 0.85) or attempts >= 80 or not legitAutoFishEnabled
+						until currentPower >= 0.95 or attempts >= 80 or not legitAutoFishEnabled
 
 						if legitAutoFishEnabled and FishingController:_getPower() >= 0.5 then
 							pcall(function()
@@ -490,13 +472,6 @@ return function(config)
 		if statusDisplay then
 			statusDisplay:SetContent("Status: Inactive")
 		end
-
-		Notifier.new({
-			Title = "Smart Detector",
-			Content = "Stopped monitoring",
-			Duration = 3,
-			Icon = "rbxassetid://95448792622941"
-		})
 	end
 
 	-- Smart detector main loop
@@ -540,13 +515,6 @@ return function(config)
 		if statusDisplay then
 			statusDisplay:SetContent("Status: " .. currentStatus)
 		end
-
-		Notifier.new({
-			Title = "Smart Detector",
-			Content = "Started monitoring fishing activity",
-			Duration = 3,
-			Icon = "rbxassetid://95448792622941"
-		})
 
 		-- Timer countdown connection (runs every second)
 		local lastTimerUpdate = tick()
@@ -630,13 +598,6 @@ return function(config)
 								local wasEnabled = smartDetectorEnabled
 								smartDetectorEnabled = false
 
-								Notifier.new({
-									Title = "Smart Detector",
-									Content = "Minigame stuck detected - resetting character...",
-									Duration = 3,
-									Icon = "rbxassetid://95448792622941"
-								})
-
 								pcall(function()
 									if player.Character then player.Character:BreakJoints() end
 								end)
@@ -666,13 +627,6 @@ return function(config)
 										print("Position and rotation updated after reset")
 									end
 
-									Notifier.new({
-										Title = "Smart Detector",
-										Content = "Stuck recovery completed - restarting detector",
-										Duration = 3,
-										Icon = "rbxassetid://95448792622941"
-									})
-
 									print("Stuck recovery completed - restarting smart detector")
 									task.wait(1)
 									startSmartDetector()
@@ -686,13 +640,6 @@ return function(config)
 									fishCaughtSinceStart = newFishCount - initialFishCount
 									currentStatus = "Fish Caught"
 									updateDisplays()
-
-									Notifier.new({
-										Title = "Smart Detector",
-										Content = "Fish completed - timer reset",
-										Duration = 2,
-										Icon = "rbxassetid://95448792622941"
-									})
 
 									task.wait(1)
 									currentStatus = "Active"
