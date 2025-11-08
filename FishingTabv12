@@ -1,4 +1,4 @@
--- Fishing Tab for FishClarity
+-- Fishing Tab for FishClarityvvvvvvv
 -- Smart Detector feature for stuck detection and auto-reset
 
 return function(config)
@@ -210,11 +210,10 @@ return function(config)
 						if legitDelay > 0 and elapsed >= legitDelay then  -- Only fire remote if legitDelay > 0
 							pcall(function() finishRemote:FireServer() end)
 							minigameStartTime = nil
-							-- Play idle animation during the 1.30 second wait period
+							-- Stop all animations and let game handle idle naturally during wait
 							if AnimationController then
 								pcall(function()
 									AnimationController:DestroyActiveAnimationTracks()
-									AnimationController:PlayAnimation("EquipIdle")
 								end)
 							end
 							-- Add 1.30 second wait after finishing minigame before starting next fishing cycle
