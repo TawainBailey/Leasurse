@@ -1,6 +1,3 @@
--- Fishing Tab for FishClarity
--- Smart Detector feature for stuck detection and auto-reset
-
 return function(config)
 	local FishingTab = config.FishingTab
 	local Notifier = config.Notifier
@@ -284,8 +281,22 @@ return function(config)
 									end)
 								end
 
+								-- Small delay to let animation start
+								task.wait(0.1)
+
 								FishingController:UpdateChargeState(nil)
 								local success, fishData = FishingController:SendFishingRequestToServer(screenCenter, power)
+
+								if not success then
+									-- Cast failed, stop animation and skip this attempt
+									if AnimationController then
+										pcall(function()
+											AnimationController:DestroyActiveAnimationTracks()
+										end)
+									end
+									return -- Don't proceed, try again next loop
+								end
+
 								if success and fishData then
 									task.wait(0.3)
 									FishingController:FishingRodStarted(fishData)
@@ -613,26 +624,52 @@ return function(config)
 						pcall(function() finishRemote:FireServer() end)
 						lastMinigameTime = nil
 
-						-- Check if fish was caught
+						-- Check if minigame actually completed and fish was caught
 						task.wait(0.5)
-						local newFishCount = getTotalFishCount()
-						if newFishCount > initialFishCount then
-							-- Fish was caught, reset timer
-							detectorTimer = 0
-							fishCaughtSinceStart = newFishCount - initialFishCount
-							currentStatus = "Fish Caught"
-							updateDisplays()
+						
+						-- First check if minigame is still active (stuck detection)
+						local minigameStillActive = FishingController:GetCurrentGUID() ~= nil
+						
+						if minigameStillActive then
+							-- Minigame completion failed, trigger stuck recovery
+							if (tick() - lastResetTime) >= RESET_COOLDOWN then
+								Notifier.new({
+									Title = "Smart Detector",
+									Content = "Minigame stuck after completion attempt - resetting character",
+									Duration = 3,
+									Icon = "rbxassetid://95448792622941"
+								})
+								resetCharacter()
+								detectorTimer = 0
+							end
+						else
+							-- Minigame completed, check if fish was caught
+							local newFishCount = getTotalFishCount()
+							if newFishCount > initialFishCount then
+								-- Fish was caught, reset timer
+								detectorTimer = 0
+								fishCaughtSinceStart = newFishCount - initialFishCount
+								currentStatus = "Fish Caught"
+								updateDisplays()
 
-							Notifier.new({
-								Title = "Smart Detector",
-								Content = "Fish completed - timer reset",
-								Duration = 2,
-								Icon = "rbxassetid://95448792622941"
-							})
+								Notifier.new({
+									Title = "Smart Detector",
+									Content = "Fish completed - timer reset",
+									Duration = 2,
+									Icon = "rbxassetid://95448792622941"
+								})
 
-							task.wait(1)
-							currentStatus = "Active"
-							updateDisplays()
+								task.wait(1)
+								currentStatus = "Active"
+								updateDisplays()
+							else
+								-- No fish caught but minigame ended (maybe missed or rare fish)
+								currentStatus = "Minigame Ended"
+								updateDisplays()
+								task.wait(1)
+								currentStatus = "Active"
+								updateDisplays()
+							end
 						end
 					end
 				else
