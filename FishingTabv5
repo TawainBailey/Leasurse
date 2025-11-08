@@ -1,4 +1,4 @@
--fuckyou
+
 return function(config)
 	local FishingTab = config.FishingTab
 	local Notifier = config.Notifier
