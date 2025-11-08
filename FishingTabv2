@@ -1,4 +1,4 @@
--- Fishing Tab for FishClarityv3
+-- Fishing Tab for FishClarity
 -- Smart Detector feature for stuck detection and auto-reset
 
 return function(config)
@@ -41,7 +41,8 @@ return function(config)
 	local RESET_COOLDOWN = 10
 	local currentStatus = "Inactive"
 	local timeDisplay, bagDisplay, statusDisplay
-	local lastFishCount = 0
+	local initialFishCount = 0 -- Fish count when detector started
+	local fishCaughtSinceStart = 0 -- Fish caught since detector started
 
 	-- Check if rod is equipped
 	local function isRodEquipped()
@@ -56,8 +57,8 @@ return function(config)
 		return false
 	end
 
-	-- Get fish count from inventory
-	local function getFishCount()
+	-- Get total fish count from inventory
+	local function getTotalFishCount()
 		if replion then
 			local success, items = pcall(function()
 				return replion:GetExpect({"Inventory", "Items"})
@@ -82,8 +83,7 @@ return function(config)
 			timeDisplay:SetContent(string.format("Timer: %d/%d", detectorTimer, waitTime))
 		end
 		if bagDisplay then
-			local currentCount = getFishCount()
-			bagDisplay:SetContent(string.format("Fish: %d", currentCount))
+			bagDisplay:SetContent(string.format("Fish Caught: %d", fishCaughtSinceStart))
 		end
 		if statusDisplay then
 			statusDisplay:SetContent("Status: " .. currentStatus)
@@ -96,6 +96,11 @@ return function(config)
 
 		lastResetTime = tick()
 		currentStatus = "Resetting..."
+
+		-- Update original position to current location before resetting
+		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			originalPosition = player.Character.HumanoidRootPart.Position
+		end
 
 		pcall(function()
 			player.Character:BreakJoints()
@@ -120,6 +125,25 @@ return function(config)
 		updateDisplays()
 	end
 
+	-- Stop Smart Detector and reset all variables
+	local function stopSmartDetector()
+		smartDetectorEnabled = false
+		detectorTimer = 0
+		originalPosition = nil
+		lastCastPosition = nil
+		currentStatus = "Inactive"
+		initialFishCount = 0
+		fishCaughtSinceStart = 0
+		updateDisplays()
+
+		Notifier.new({
+			Title = "Smart Detector",
+			Content = "Stopped monitoring",
+			Duration = 3,
+			Icon = "rbxassetid://95448792622941"
+		})
+	end
+
 	-- Smart detector main loop
 	local function startSmartDetector()
 		if not FishingController then
@@ -142,9 +166,11 @@ return function(config)
 			return
 		end
 
+		-- Reset all variables
 		smartDetectorEnabled = true
 		detectorTimer = 0 -- Start from 0
-		lastFishCount = getFishCount()
+		initialFishCount = getTotalFishCount()
+		fishCaughtSinceStart = 0
 
 		-- Save original position
 		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
@@ -189,6 +215,8 @@ return function(config)
 		-- Status monitoring loop
 		task.spawn(function()
 			local lastMinigameTime = nil
+			local isCasting = false
+			local lastPowerCheck = 0
 
 			while smartDetectorEnabled do
 				pcall(function()
@@ -202,6 +230,7 @@ return function(config)
 
 					if currentMinigameActive then
 						currentStatus = "Minigame"
+						isCasting = false
 
 						if not lastMinigameTime then
 							lastMinigameTime = tick()
@@ -216,11 +245,11 @@ return function(config)
 
 							-- Check if fish was caught
 							task.wait(0.5)
-							local newFishCount = getFishCount()
-							if newFishCount > lastFishCount then
+							local newFishCount = getTotalFishCount()
+							if newFishCount > initialFishCount then
 								-- Fish was caught, reset timer
 								detectorTimer = 0
-								lastFishCount = newFishCount
+								fishCaughtSinceStart = newFishCount - initialFishCount
 								currentStatus = "Fish Caught"
 								updateDisplays()
 
@@ -240,59 +269,60 @@ return function(config)
 							lastMinigameTime = nil
 						end
 
-						-- Check if casting
-						if FishingController._getPower and FishingController:_getPower() > 0 then
-							currentStatus = "Casting"
-						else
-							currentStatus = "Idle"
+						-- Check if casting (only when power is actively building)
+						local now = tick()
+						if now - lastPowerCheck >= 0.1 then
+							lastPowerCheck = now
+
+							if FishingController._getPower then
+								local currentPower = FishingController:_getPower()
+								local isPowerBuilding = false
+
+								-- Check if power is increasing (actually casting)
+								if currentPower > 0.01 then
+									task.wait(0.05)
+									local nextPower = FishingController:_getPower()
+									isPowerBuilding = nextPower > currentPower
+								end
+
+								if isPowerBuilding then
+									if not isCasting then
+										isCasting = true
+										currentStatus = "Casting"
+									end
+								else
+									if isCasting then
+										isCasting = false
+										currentStatus = "Idle"
+									end
+								end
+							else
+								currentStatus = "Idle"
+								isCasting = false
+							end
 						end
 					end
 				end)
 
-				task.wait(0.1)
+				task.wait(0.05) -- More frequent checks for better status detection
 			end
 		end)
 
-		-- Position tracking loop
+		-- Position tracking loop - constantly update original position
 		task.spawn(function()
 			while smartDetectorEnabled do
-				task.wait(2)
+				task.wait(1) -- Check every second
 				if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
 					local hrp = player.Character.HumanoidRootPart
+					local currentPos = hrp.Position
 
-					if lastCastPosition then
-						local distanceFromLastCast = (hrp.Position - lastCastPosition).Magnitude
-
-						if distanceFromLastCast >= 10 then
-							originalPosition = hrp.Position
-							lastCastPosition = originalPosition
-						end
-					elseif originalPosition then
-						local distance = (hrp.Position - originalPosition).Magnitude
-						if distance >= 10 then
-							originalPosition = hrp.Position
-							lastCastPosition = hrp.Position
-						end
-					else
-						originalPosition = hrp.Position
-						lastCastPosition = hrp.Position
-					end
+					-- Always update original position to current location
+					-- This ensures we teleport back to where we are when reset triggers
+					originalPosition = currentPos
+					lastCastPosition = currentPos
 				end
 			end
 		end)
-	end
-
-	local function stopSmartDetector()
-		smartDetectorEnabled = false
-		currentStatus = "Inactive"
-		updateDisplays()
-
-		Notifier.new({
-			Title = "Smart Detector",
-			Content = "Stopped monitoring",
-			Duration = 3,
-			Icon = "rbxassetid://95448792622941"
-		})
 	end
 
 	-- Create Fishing Features section
@@ -308,7 +338,7 @@ return function(config)
 
 	bagDisplay = FishingFeaturesSection:AddParagraph({
 		Title = "Bag",
-		Content = "Fish: " .. getFishCount()
+		Content = "Fish Caught: " .. fishCaughtSinceStart
 	});
 
 	statusDisplay = FishingFeaturesSection:AddParagraph({
