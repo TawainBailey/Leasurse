@@ -210,10 +210,11 @@ return function(config)
 						if legitDelay > 0 and elapsed >= legitDelay then  -- Only fire remote if legitDelay > 0
 							pcall(function() finishRemote:FireServer() end)
 							minigameStartTime = nil
-							-- Stop any active animations before the wait period
+							-- Play idle animation during the 1.30 second wait period
 							if AnimationController then
 								pcall(function()
 									AnimationController:DestroyActiveAnimationTracks()
+									AnimationController:PlayAnimation("EquipIdle")
 								end)
 							end
 							-- Add 1.30 second wait after finishing minigame before starting next fishing cycle
