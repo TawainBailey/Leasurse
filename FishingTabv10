@@ -1,3 +1,5 @@
+
+-- Smart Detect
 return function(config)
 	local FishingTab = config.FishingTab
 	local Notifier = config.Notifier
@@ -207,7 +209,8 @@ return function(config)
 						if legitDelay > 0 and elapsed >= legitDelay then  -- Only fire remote if legitDelay > 0
 							pcall(function() finishRemote:FireServer() end)
 							minigameStartTime = nil
-							task.wait(0.1)
+							-- Add 1.30 second wait after finishing minigame before starting next fishing cycle
+							task.wait(1.30)
 						else
 							if elapsed >= manipulationDelay then
 								pcall(function() FishingController:FishingMinigameClick() end)
