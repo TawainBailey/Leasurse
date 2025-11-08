@@ -1,3 +1,6 @@
+-- Fishing Tab for FishClarity
+-- Smart Detector feature for stuck detection and auto-reset
+
 return function(config)
 	local FishingTab = config.FishingTab
 	local Notifier = config.Notifier
@@ -99,6 +102,9 @@ return function(config)
 	local autoSellEnabled = false
 	local sellThreshold = 0
 	local sellConnection = nil
+	local sellNotificationCounter = 0
+	local lastSellTime = 0
+	local RFSellAllItems = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/SellAllItems"]
 
 	-- Check if rod is equipped
 	local function isRodEquipped()
@@ -695,6 +701,65 @@ return function(config)
 		end)
 	end
 
+	-- ============================================
+	-- SELL FUNCTIONS
+	-- ============================================
+
+	local function sellAllItems()
+		pcall(function()
+			RFSellAllItems:InvokeServer()
+		end)
+	end
+
+	local function autoSellFish()
+		if not autoSellEnabled or sellThreshold <= 0 then return end
+		
+		local currentTime = tick()
+		if currentTime - lastSellTime >= sellThreshold then
+			sellAllItems()
+			lastSellTime = currentTime
+			
+			sellNotificationCounter = sellNotificationCounter + 1
+			
+			if sellNotificationCounter >= 5 then
+				Notifier.new({
+					Title = "Auto Sell",
+					Content = "Sold all items",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+				sellNotificationCounter = 0
+			end
+		end
+	end
+
+	local function startAutoSell()
+		if sellConnection then
+			sellConnection:Disconnect()
+		end
+		
+		lastSellTime = tick()
+		
+		sellConnection = RunService.Heartbeat:Connect(function()
+			if autoSellEnabled then
+				autoSellFish()
+			end
+		end)
+	end
+
+	local function stopAutoSell()
+		if sellConnection then
+			sellConnection:Disconnect()
+			sellConnection = nil
+		end
+		sellNotificationCounter = 0
+		lastSellTime = 0
+	end
+
+	-- ============================================
+	-- UI CREATION
+	-- ============================================
+
 	-- Create Fishing Features section
 	local FishingFeaturesSection = FishingTab:DrawSection({
 		Name = "Fishing Features",
@@ -867,6 +932,65 @@ return function(config)
 			if value and value >= 0.1 and value <= 1 then
 				manipulationDelay = value
 			end
+		end,
+	});
+
+	-- ============================================
+	-- SELL SECTION
+	-- ============================================
+
+	local SellSection = FishingTab:DrawSection({
+		Name = "Sell",
+	});
+
+	SellSection:AddToggle({
+		Name = "Auto Sell",
+		Default = false,
+		Callback = function(Value)
+			autoSellEnabled = Value
+			
+			if Value then
+				startAutoSell()
+				Notifier.new({
+					Title = "Auto Sell Enabled",
+					Content = "Will auto-sell every " .. sellThreshold .. " seconds",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				});
+			else
+				stopAutoSell()
+				Notifier.new({
+					Title = "Auto Sell Disabled",
+					Content = "Auto sell turned off",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				});
+			end
+		end,
+	});
+
+	SellSection:AddTextBox({
+		Name = "Sell Timer (seconds)",
+		Default = "0",
+		Placeholder = "0+ seconds",
+		Callback = function(Text)
+			local value = tonumber(Text)
+			if value and value >= 0 then
+				sellThreshold = value
+			end
+		end,
+	});
+
+	SellSection:AddButton({
+		Name = "Sell All",
+		Callback = function()
+			sellAllItems()
+			Notifier.new({
+				Title = "Sell All",
+				Content = "Sold all items",
+				Duration = 2,
+				Icon = "rbxassetid://124426992222665"
+			});
 		end,
 	});
 end
