@@ -1,4 +1,4 @@
--- Fishing Tab for FishClarityvvvvvvv
+-- Fishing Tab for FishClarity
 -- Smart Detector feature for stuck detection and auto-reset
 
 return function(config)
@@ -493,6 +493,12 @@ return function(config)
 
 	-- Smart detector main loop
 	local function startSmartDetector()
+		-- Stop any existing detector first to prevent double connections
+		if smartDetectorEnabled then
+			stopSmartDetector()
+			task.wait(0.1) -- Brief pause to ensure cleanup
+		end
+		
 		if not FishingController then
 			Notifier.new({
 				Title = "Error",
