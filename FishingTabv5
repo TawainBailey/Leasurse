@@ -1,6 +1,3 @@
--- Fishing Tab for FishClarity
--- Smart Detector feature for stuck detection and auto-reset
---2
 return function(config)
 	local FishingTab = config.FishingTab
 	local Notifier = config.Notifier
@@ -51,31 +48,13 @@ return function(config)
 	-- Auto Fish variables
 	local legitAutoFishEnabled = false
 	local autoEquipRodEnabled = false
-	local autoClickMinigame = false
-	local castDelay = 1
-	local reelDelay = 1
+	local autoClickMinigameEnabled = false
+	local legitDelay = 1.1
+	local shakeDelay = 0.1
+	local manipulationDelay = 0.12
 	local autoFishConnection = nil
 	local equipRodConnection = nil
-
-	-- Event Fishing variables
-	local eventTeleportEnabled = false
-	local selectedEvents = {}
-	local eventPriority = "Closest"
-	local eventTeleportConnection = nil
-
-	-- Favorite variables
-	local autoFavoriteEnabled = false
-	local autoUnfavoriteEnabled = false
-	local selectedFishNames = {}
-	local selectedFishRarities = {}
-	local selectedFishVariants = {}
-	local favoriteConnection = nil
-	local unfavoriteConnection = nil
-
-	-- Sell variables
-	local autoSellEnabled = false
-	local sellThreshold = 30
-	local sellConnection = nil
+	local standaloneMinigameLoop = nil
 
 	-- ============================================
 	-- LEGIT AUTO FISH VARIABLES
@@ -280,349 +259,78 @@ return function(config)
 	end
 
 	-- ============================================
-	-- EVENT FISHING FUNCTIONS
+	-- STANDALONE AUTO CLICK MINIGAME FUNCTIONS
 	-- ============================================
 
-	-- Get available events
-	local function getAvailableEvents()
-		local events = {}
-		local workspaceEvents = workspace:FindFirstChild("Events")
-		if workspaceEvents then
-			for _, eventPart in ipairs(workspaceEvents:GetChildren()) do
-				if eventPart:IsA("BasePart") then
-					table.insert(events, eventPart.Name)
-				end
-			end
-		end
-		return events
-	end
+	-- Start standalone auto click minigame
+	local function StartStandaloneAutoClickMinigame()
+		if standaloneMinigameLoop then return end
 
-	-- Get all available fish names
-	local function getAllFishNames()
-		local fishNames = {}
-		if ItemUtility and ItemUtility.Fish then
-			for name, _ in pairs(ItemUtility.Fish) do
-				table.insert(fishNames, name)
-			end
-		end
-		table.sort(fishNames)
-		return fishNames
-	end
+		standaloneMinigameLoop = task.spawn(function()
+			local minigameStartTime = nil
+			local lastMinigameState = false
 
-	-- Get all available fish variants
-	local function getAllFishVariants()
-		local variants = {}
-		if ItemUtility and ItemUtility.Fish then
-			for _, fishData in pairs(ItemUtility.Fish) do
-				if fishData.Variants then
-					for variant, _ in pairs(fishData.Variants) do
-						if not table.find(variants, variant) then
-							table.insert(variants, variant)
-						end
-					end
-				end
-			end
-		end
-		table.sort(variants)
-		return variants
-	end
-
-	-- Teleport to event
-	local function teleportToEvent(eventPart, eventName)
-		if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
-
-		local hrp = player.Character.HumanoidRootPart
-		local eventPosition = eventPart.Position
-
-		-- Create body position for smooth teleport
-		local bodyPosition = Instance.new("BodyPosition")
-		bodyPosition.Position = eventPosition + Vector3.new(0, 5, 0)
-		bodyPosition.MaxForce = Vector3.new(10000, 10000, 10000)
-		bodyPosition.D = 2000
-		bodyPosition.P = 25000
-		bodyPosition.Parent = hrp
-
-		task.wait(2)
-		bodyPosition:Destroy()
-	end
-
-	-- Start event teleport
-	local function startEventTeleport()
-		if eventTeleportConnection then
-			eventTeleportConnection:Disconnect()
-		end
-
-		eventTeleportConnection = RunService.Heartbeat:Connect(function()
-			if not eventTeleportEnabled then return end
-
-			local workspaceEvents = workspace:FindFirstChild("Events")
-			if not workspaceEvents then return end
-
-			-- Check for prioritized event first
-			if prioritizedEvent then
-				local prioritizedPart = workspaceEvents:FindFirstChild(prioritizedEvent)
-				if prioritizedPart and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-					local distance = (prioritizedPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-					if distance > 50 then -- Only teleport if far away
-						teleportToEvent(prioritizedPart, prioritizedEvent)
-						Notifier.new({
-							Title = "Event Teleport",
-							Content = "Teleported to prioritized " .. prioritizedEvent,
-							Duration = 3,
-							Icon = "rbxassetid://95448792622941"
-						})
+			while autoClickMinigameEnabled do
+				pcall(function()
+					if not FishingController then
+						task.wait(0.1)
 						return
 					end
-				end
-			end
 
-			-- Check for selected events
-			for _, eventName in ipairs(selectedEvents) do
-				local eventPart = workspaceEvents:FindFirstChild(eventName)
-				if eventPart and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-					local distance = (eventPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-					if distance > 50 then
-						teleportToEvent(eventPart, eventName)
-						Notifier.new({
-							Title = "Event Teleport",
-							Content = "Teleported to " .. eventName,
-							Duration = 3,
-							Icon = "rbxassetid://95448792622941"
-						})
-						return
-					end
-				end
-			end
-		end)
-	end
+					local currentMinigameActive = FishingController:GetCurrentGUID() ~= nil
 
-	-- Stop event teleport
-	local function stopEventTeleport()
-		if eventTeleportConnection then
-			eventTeleportConnection:Disconnect()
-			eventTeleportConnection = nil
-		end
-	end
+					if currentMinigameActive then
+						if not minigameStartTime then
+							minigameStartTime = tick()
+						end
 
-	-- ============================================
-	-- FAVORITE SYSTEM FUNCTIONS
-	-- ============================================
+						local minigameElapsedTime = tick() - minigameStartTime
 
-	-- Check if fish matches criteria
-	local function fishMatchesCriteria(fishName, fishData)
-		-- Check name
-		if #selectedFishNames > 0 then
-			local nameMatches = false
-			for _, selectedName in ipairs(selectedFishNames) do
-				if fishName:find(selectedName) then
-					nameMatches = true
-					break
-				end
-			end
-			if not nameMatches then return false end
-		end
+						if legitDelay and legitDelay > 0 and minigameElapsedTime >= legitDelay then
+							pcall(function()
+								finishRemote:FireServer()
+							end)
 
-		-- Check rarity
-		if #selectedRarity > 0 then
-			local rarity = fishData and fishData.Rarity or "Common"
-			local rarityMatches = false
-			for _, selectedRarityItem in ipairs(selectedRarity) do
-				if rarity == selectedRarityItem then
-					rarityMatches = true
-					break
-				end
-			end
-			if not rarityMatches then return false end
-		end
-
-		-- Check variant
-		if #selectedVariant > 0 then
-			local variant = fishData and fishData.Variant or nil
-			local variantMatches = false
-			for _, selectedVariantItem in ipairs(selectedVariant) do
-				if variant == selectedVariantItem then
-					variantMatches = true
-					break
-				end
-			end
-			if not variantMatches then return false end
-		end
-
-		return true
-	end
-
-	-- Start auto favorite
-	local function startAutoFavorite()
-		if favoriteConnection then
-			favoriteConnection:Disconnect()
-		end
-
-		favoriteConnection = finishRemote.OnClientEvent:Connect(function()
-			if not autoFavoriteEnabled then return end
-
-			task.wait(0.5) -- Wait for inventory to update
-
-			if replion then
-				local success, items = pcall(function()
-					return replion:GetExpect({"Inventory", "Items"})
-				end)
-
-				if success and items then
-					for _, item in ipairs(items) do
-						local itemData = ItemUtility.GetItemDataFromItemType("Items", item.Id)
-						if itemData and itemData.Data and itemData.Data.Type == "Fish" then
-							local fishName = itemData.Data.Name or item.Id
-
-							if fishMatchesCriteria(fishName, itemData.Data) and not item.Favorite then
-								-- Favorite the fish
-								local favoriteRemote = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")
-									:WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):WaitForChild("RE/FavoriteItem")
-
-								pcall(function() favoriteRemote:FireServer(item.Id, true) end)
+							minigameStartTime = nil
+							task.wait(0.1)
+						else
+							if minigameElapsedTime >= shakeDelay then
+								FishingController:FishingMinigameClick()
+								task.wait(0.01)
+							else
+								task.wait(0.01)
 							end
 						end
+					else
+						minigameStartTime = nil
+						task.wait(0.05)
 					end
-				end
-			end
-		end)
-	end
 
-	-- Stop auto favorite
-	local function stopAutoFavorite()
-		if favoriteConnection then
-			favoriteConnection:Disconnect()
-			favoriteConnection = nil
-		end
-	end
-
-	-- Start auto unfavorite
-	local function startAutoUnfavorite()
-		if favoriteConnection then
-			favoriteConnection:Disconnect()
-		end
-
-		favoriteConnection = finishRemote.OnClientEvent:Connect(function()
-			if not autoUnfavoriteEnabled then return end
-
-			task.wait(0.5) -- Wait for inventory to update
-
-			if replion then
-				local success, items = pcall(function()
-					return replion:GetExpect({"Inventory", "Items"})
+					lastMinigameState = currentMinigameActive
 				end)
-
-				if success and items then
-					for _, item in ipairs(items) do
-						local itemData = ItemUtility.GetItemDataFromItemType("Items", item.Id)
-						if itemData and itemData.Data and itemData.Data.Type == "Fish" then
-							local fishName = itemData.Data.Name or item.Id
-
-							if fishMatchesCriteria(fishName, itemData.Data) and item.Favorite then
-								-- Unfavorite the fish
-								local favoriteRemote = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")
-									:WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):WaitForChild("RE/FavoriteItem")
-
-								pcall(function() favoriteRemote:FireServer(item.Id, false) end)
-							end
-						end
-					end
-				end
 			end
+			standaloneMinigameLoop = nil
 		end)
 	end
 
-	-- Stop auto unfavorite
-	local function stopAutoUnfavorite()
-		if favoriteConnection then
-			favoriteConnection:Disconnect()
-			favoriteConnection = nil
-		end
-	end
-
-	-- Unfavorite all fish
-	local function unfavoriteAllFish()
-		if replion then
-			local success, items = pcall(function()
-				return replion:GetExpect({"Inventory", "Items"})
+	-- Stop standalone auto click minigame
+	local function StopStandaloneAutoClickMinigame()
+		autoClickMinigameEnabled = false
+		if standaloneMinigameLoop then
+			pcall(function()
+				task.cancel(standaloneMinigameLoop)
 			end)
-
-			if success and items then
-				local favoriteRemote = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")
-					:WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):WaitForChild("RE/FavoriteItem")
-
-				for _, item in ipairs(items) do
-					local itemData = ItemUtility.GetItemDataFromItemType("Items", item.Id)
-					if itemData and itemData.Data and itemData.Data.Type == "Fish" and item.Favorite then
-						pcall(function() favoriteRemote:FireServer(item.Id, false) end)
-					end
-				end
-
-				Notifier.new({
-					Title = "Unfavorite All",
-					Content = "Unfavorited all fish",
-					Duration = 2,
-					Icon = "rbxassetid://95448792622941"
-				})
-			end
+			standaloneMinigameLoop = nil
 		end
 	end
 
 	-- ============================================
-	-- AUTO SELL FUNCTIONS
+	-- RESET CHARACTER FUNCTIONS
 	-- ============================================
 
-	-- Sell all items
-	local function sellAllItems()
-		if replion then
-			local success, items = pcall(function()
-				return replion:GetExpect({"Inventory", "Items"})
-			end)
-
-			if success and items then
-				local sellRemote = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")
-					:WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):WaitForChild("RE/SellItem")
-
-				for _, item in ipairs(items) do
-					if item.Count and item.Count > 0 then
-						pcall(function() sellRemote:FireServer(item.Id, item.Count) end)
-					end
-				end
-
-				Notifier.new({
-					Title = "Sell All",
-					Content = "Sold all items",
-					Duration = 2,
-					Icon = "rbxassetid://95448792622941"
-				})
-			end
-		end
-	end
-
-	-- Start auto sell
-	local function startAutoSell()
-		if sellConnection then
-			sellConnection:Disconnect()
-		end
-
-		local lastSellTime = tick()
-		sellConnection = RunService.Heartbeat:Connect(function()
-			if not autoSellEnabled or sellThreshold <= 0 then return end
-
-			local currentTime = tick()
-			if currentTime - lastSellTime >= sellThreshold then
-				lastSellTime = currentTime
-				sellAllItems()
-			end
-		end)
-	end
-
-	-- Stop auto sell
-	local function stopAutoSell()
-		if sellConnection then
-			sellConnection:Disconnect()
-			sellConnection = nil
-		end
-	end
+	-- ============================================
+	-- SMART DETECTOR FUNCTIONS
+	-- ============================================
 
 	-- Reset character
 	local function resetCharacter()
@@ -954,11 +662,23 @@ return function(config)
 	AutoFishSection:AddToggle({
 		Name = "Legit Auto Fish",
 		Default = false,
-		Callback = function(enabled)
-			if enabled then
+		Callback = function(Value)
+			if Value then
 				StartLegitAutoFish()
+				Notifier.new({
+					Title = "Legit Auto Fish",
+					Content = "Legit auto fish enabled",
+					Duration = 3,
+					Icon = "rbxassetid://95448792622941"
+				});
 			else
 				StopLegitAutoFish()
+				Notifier.new({
+					Title = "Legit Auto Fish",
+					Content = "Legit auto fish disabled",
+					Duration = 2,
+					Icon = "rbxassetid://95448792622941"
+				});
 			end
 		end,
 	});
@@ -967,11 +687,25 @@ return function(config)
 	AutoFishSection:AddToggle({
 		Name = "Auto Equip Rod",
 		Default = false,
-		Callback = function(enabled)
-			if enabled then
+		Callback = function(Value)
+			autoEquipRodEnabled = Value
+
+			if Value then
 				startAutoEquipRod()
+				Notifier.new({
+					Title = "Auto Equip Rod",
+					Content = "Auto Equip Rod enabled",
+					Duration = 3,
+					Icon = "rbxassetid://95448792622941"
+				});
 			else
 				stopAutoEquipRod()
+				Notifier.new({
+					Title = "Auto Equip Rod",
+					Content = "Auto Equip Rod disabled",
+					Duration = 2,
+					Icon = "rbxassetid://95448792622941"
+				});
 			end
 		end,
 	});
@@ -980,263 +714,65 @@ return function(config)
 	AutoFishSection:AddToggle({
 		Name = "Auto Click Minigame",
 		Default = false,
-		Callback = function(enabled)
-			autoClickMinigame = enabled
-			if enabled then
+		Callback = function(Value)
+			autoClickMinigameEnabled = Value
+
+			if Value then
+				StartStandaloneAutoClickMinigame()
 				Notifier.new({
 					Title = "Auto Click Minigame",
-					Content = "Enabled",
-					Duration = 2,
+					Content = "Auto Click Minigame enabled",
+					Duration = 3,
 					Icon = "rbxassetid://95448792622941"
-				})
+				});
 			else
+				StopStandaloneAutoClickMinigame()
 				Notifier.new({
 					Title = "Auto Click Minigame",
-					Content = "Disabled",
+					Content = "Auto Click Minigame disabled",
 					Duration = 2,
 					Icon = "rbxassetid://95448792622941"
-				})
+				});
 			end
 		end,
 	});
 
-	-- Cast Delay textbox
-	AutoFishSection:AddTextbox({
-		Name = "Cast Delay (seconds)",
-		Default = "1",
-		TextDisappear = true,
-		Callback = function(value)
-			local num = tonumber(value)
-			if num and num > 0 then
-				castDelay = num
-				Notifier.new({
-					Title = "Cast Delay",
-					Content = "Set to " .. num .. " seconds",
-					Duration = 2,
-					Icon = "rbxassetid://95448792622941"
-				})
-			else
-				Notifier.new({
-					Title = "Error",
-					Content = "Invalid cast delay value",
-					Duration = 2,
-					Icon = "rbxassetid://95448792622941"
-				})
+	-- Legit Delay textbox
+	AutoFishSection:AddTextBox({
+		Name = "Legit Delay",
+		Default = "1.1",
+		Placeholder = "0-10 seconds",
+		Callback = function(Text)
+			local value = tonumber(Text)
+			if value and value >= 0 and value <= 10 then
+				legitDelay = value
 			end
 		end,
 	});
 
-	-- Reel Delay textbox
-	AutoFishSection:AddTextbox({
-		Name = "Reel Delay (seconds)",
-		Default = "1",
-		TextDisappear = true,
-		Callback = function(value)
-			local num = tonumber(value)
-			if num and num > 0 then
-				reelDelay = num
-				Notifier.new({
-					Title = "Reel Delay",
-					Content = "Set to " .. num .. " seconds",
-					Duration = 2,
-					Icon = "rbxassetid://95448792622941"
-				})
-			else
-				Notifier.new({
-					Title = "Error",
-					Content = "Invalid reel delay value",
-					Duration = 2,
-					Icon = "rbxassetid://95448792622941"
-				})
+	-- MiniGame Delay textbox
+	AutoFishSection:AddTextBox({
+		Name = "MiniGame Delay",
+		Default = "0.1",
+		Placeholder = "0+ seconds",
+		Callback = function(Text)
+			local value = tonumber(Text)
+			if value and value >= 0 then
+				shakeDelay = value
 			end
 		end,
 	});
 
-	-- ============================================
-	-- EVENT FISHING SECTION
-	-- ============================================
-
-	local EventFishingSection = FishingTab:DrawSection({
-		Name = "Event Fishing",
-		Icon = "rbxassetid://95448792622941"
-	});
-
-	-- Event selection dropdown
-	EventFishingSection:AddDropdown({
-		Name = "Select Events",
-		Multi = true,
-		Options = getAvailableEvents(),
-		Default = {},
-		Callback = function(selected)
-			selectedEvents = selected
-			Notifier.new({
-				Title = "Events Selected",
-				Content = "Selected " .. #selected .. " events",
-				Duration = 2,
-				Icon = "rbxassetid://95448792622941"
-			})
-		end,
-	});
-
-	-- Event priority dropdown
-	EventFishingSection:AddDropdown({
-		Name = "Event Priority",
-		Options = {"Closest", "Random", "Furthest"},
-		Default = "Closest",
-		Callback = function(selected)
-			eventPriority = selected
-			Notifier.new({
-				Title = "Event Priority",
-				Content = "Set to " .. selected,
-				Duration = 2,
-				Icon = "rbxassetid://95448792622941"
-			})
-		end,
-	});
-
-	-- Auto Teleport to Events toggle
-	EventFishingSection:AddToggle({
-		Name = "Auto Teleport to Events",
-		Default = false,
-		Callback = function(enabled)
-			if enabled then
-				startEventTeleport()
-			else
-				stopEventTeleport()
+	-- Manipulation Delay textbox
+	AutoFishSection:AddTextBox({
+		Name = "Manipulation Delay",
+		Default = "0.12",
+		Placeholder = "0.1-1 seconds",
+		Callback = function(Text)
+			local value = tonumber(Text)
+			if value and value >= 0.1 and value <= 1 then
+				manipulationDelay = value
 			end
-		end,
-	});
-
-	-- ============================================
-	-- FAVORITE SECTION
-	-- ============================================
-
-	local FavoriteSection = FishingTab:DrawSection({
-		Name = "Favorite",
-		Icon = "rbxassetid://95448792622941"
-	});
-
-	-- Fish names dropdown
-	FavoriteSection:AddDropdown({
-		Name = "Fish Names",
-		Multi = true,
-		Options = getAllFishNames(),
-		Default = {},
-		Callback = function(selected)
-			selectedFishNames = selected
-		end,
-	});
-
-	-- Fish rarity dropdown
-	FavoriteSection:AddDropdown({
-		Name = "Fish Rarity",
-		Multi = true,
-		Options = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"},
-		Default = {},
-		Callback = function(selected)
-			selectedFishRarities = selected
-		end,
-	});
-
-	-- Fish variant dropdown
-	FavoriteSection:AddDropdown({
-		Name = "Fish Variant",
-		Multi = true,
-		Options = getAllFishVariants(),
-		Default = {},
-		Callback = function(selected)
-			selectedFishVariants = selected
-		end,
-	});
-
-	-- Auto Favorite toggle
-	FavoriteSection:AddToggle({
-		Name = "Auto Favorite",
-		Default = false,
-		Callback = function(enabled)
-			if enabled then
-				startAutoFavorite()
-			else
-				stopAutoFavorite()
-			end
-		end,
-	});
-
-	-- Auto Unfavorite toggle
-	FavoriteSection:AddToggle({
-		Name = "Auto Unfavorite",
-		Default = false,
-		Callback = function(enabled)
-			if enabled then
-				startAutoUnfavorite()
-			else
-				stopAutoUnfavorite()
-			end
-		end,
-	});
-
-	-- Unfavorite All button
-	FavoriteSection:AddButton({
-		Name = "Unfavorite All",
-		Callback = function()
-			unfavoriteAllFish()
-		end,
-	});
-
-	-- ============================================
-	-- SELL SECTION
-	-- ============================================
-
-	local SellSection = FishingTab:DrawSection({
-		Name = "Sell",
-		Icon = "rbxassetid://95448792622941"
-	});
-
-	-- Auto Sell toggle
-	SellSection:AddToggle({
-		Name = "Auto Sell",
-		Default = false,
-		Callback = function(enabled)
-			autoSellEnabled = enabled
-			if enabled then
-				startAutoSell()
-			else
-				stopAutoSell()
-			end
-		end,
-	});
-
-	-- Sell Threshold textbox
-	SellSection:AddTextbox({
-		Name = "Sell Threshold (seconds)",
-		Default = "30",
-		TextDisappear = true,
-		Callback = function(value)
-			local num = tonumber(value)
-			if num and num > 0 then
-				sellThreshold = num
-				Notifier.new({
-					Title = "Sell Threshold",
-					Content = "Set to " .. num .. " seconds",
-					Duration = 2,
-					Icon = "rbxassetid://95448792622941"
-				})
-			else
-				Notifier.new({
-					Title = "Error",
-					Content = "Invalid sell threshold value",
-					Duration = 2,
-					Icon = "rbxassetid://95448792622941"
-				})
-			end
-		end,
-	});
-
-	-- Sell All button
-	SellSection:AddButton({
-		Name = "Sell All",
-		Callback = function()
-			sellAllItems()
 		end,
 	});
 end
