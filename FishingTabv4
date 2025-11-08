@@ -1,6 +1,6 @@
 -- Fishing Tab for FishClarity
 -- Smart Detector feature for stuck detection and auto-reset
---v2
+--v3
 return function(config)
 	local FishingTab = config.FishingTab
 	local Notifier = config.Notifier
@@ -43,6 +43,10 @@ return function(config)
 	local timeDisplay, bagDisplay, statusDisplay
 	local initialFishCount = 0 -- Fish count when detector started
 	local fishCaughtSinceStart = 0 -- Fish caught since detector started
+	
+	-- Connections for Smart Detector loops
+	local timerConnection = nil
+	local statusConnection = nil
 
 	-- Check if rod is equipped
 	local function isRodEquipped()
@@ -150,6 +154,17 @@ return function(config)
 	-- Stop Smart Detector and reset all variables
 	local function stopSmartDetector()
 		smartDetectorEnabled = false
+		
+		-- Disconnect existing connections
+		if timerConnection then
+			timerConnection:Disconnect()
+			timerConnection = nil
+		end
+		if statusConnection then
+			statusConnection:Disconnect()
+			statusConnection = nil
+		end
+		
 		detectorTimer = 0
 		originalPosition = nil
 		lastCastPosition = nil
@@ -232,10 +247,14 @@ return function(config)
 			Icon = "rbxassetid://95448792622941"
 		})
 
-		-- Timer countdown loop
-		task.spawn(function()
-			while smartDetectorEnabled do
-				task.wait(1)
+		-- Timer countdown connection (runs every second)
+		local lastTimerUpdate = tick()
+		timerConnection = RunService.Heartbeat:Connect(function()
+			if not smartDetectorEnabled then return end
+			
+			local currentTime = tick()
+			if currentTime - lastTimerUpdate >= 1 then
+				lastTimerUpdate = currentTime
 				detectorTimer = detectorTimer + 1
 				updateDisplays()
 
@@ -256,85 +275,86 @@ return function(config)
 			end
 		end)
 
-		-- Status monitoring loop
-		task.spawn(function()
-			local lastMinigameTime = nil
+		-- Status monitoring connection (runs every 0.1 seconds)
+		local lastMinigameTime = nil
+		local lastStatusUpdate = tick()
+		statusConnection = RunService.Heartbeat:Connect(function()
+			if not smartDetectorEnabled then return end
+			
+			local currentTime = tick()
+			if currentTime - lastStatusUpdate < 0.1 then return end
+			lastStatusUpdate = currentTime
+			
+			pcall(function()
+				if not isRodEquipped() then
+					currentStatus = "No Rod"
+					updateDisplays()
+					return
+				end
 
-			while smartDetectorEnabled do
-				pcall(function()
-					if not isRodEquipped() then
-						currentStatus = "No Rod"
-						updateDisplays()
-						task.wait(1)
-						return
+				local currentMinigameActive = FishingController:GetCurrentGUID() ~= nil
+
+				if currentMinigameActive then
+					currentStatus = "Minigame"
+					updateDisplays()
+
+					if not lastMinigameTime then
+						lastMinigameTime = tick()
 					end
 
-					local currentMinigameActive = FishingController:GetCurrentGUID() ~= nil
+					local elapsed = tick() - lastMinigameTime
 
-					if currentMinigameActive then
-						currentStatus = "Minigame"
-						updateDisplays()
+					if elapsed >= 1.1 then
+						-- Complete the minigame
+						pcall(function() finishRemote:FireServer() end)
+						lastMinigameTime = nil
 
-						if not lastMinigameTime then
-							lastMinigameTime = tick()
+						-- Check if fish was caught
+						task.wait(0.5)
+						local newFishCount = getTotalFishCount()
+						if newFishCount > initialFishCount then
+							-- Fish was caught, reset timer
+							detectorTimer = 0
+							fishCaughtSinceStart = newFishCount - initialFishCount
+							currentStatus = "Fish Caught"
+							updateDisplays()
+
+							Notifier.new({
+								Title = "Smart Detector",
+								Content = "Fish completed - timer reset",
+								Duration = 2,
+								Icon = "rbxassetid://95448792622941"
+							})
+
+							task.wait(1)
+							currentStatus = "Active"
+							updateDisplays()
 						end
+					end
+				else
+					if lastMinigameTime then
+						lastMinigameTime = nil
+					end
 
-						local elapsed = tick() - lastMinigameTime
+					-- Simple status detection: if rod equipped and not in minigame, check if casting
+					if FishingController._getPower then
+						local currentPower = FishingController:_getPower()
 
-						if elapsed >= 1.1 then
-							-- Complete the minigame
-							pcall(function() finishRemote:FireServer() end)
-							lastMinigameTime = nil
-
-							-- Check if fish was caught
-							task.wait(0.5)
-							local newFishCount = getTotalFishCount()
-							if newFishCount > initialFishCount then
-								-- Fish was caught, reset timer
-								detectorTimer = 0
-								fishCaughtSinceStart = newFishCount - initialFishCount
-								currentStatus = "Fish Caught"
-								updateDisplays()
-
-								Notifier.new({
-									Title = "Smart Detector",
-									Content = "Fish completed - timer reset",
-									Duration = 2,
-									Icon = "rbxassetid://95448792622941"
-								})
-
-								task.wait(1)
-								currentStatus = "Active"
-								updateDisplays()
-							end
-						end
-					else
-						if lastMinigameTime then
-							lastMinigameTime = nil
-						end
-
-						-- Simple status detection: if rod equipped and not in minigame, check if casting
-						if FishingController._getPower then
-							local currentPower = FishingController:_getPower()
-
-							-- If power is above 0, player is actively casting
-							if currentPower > 0 then
-								currentStatus = "Casting"
-							else
-								-- Rod equipped, not in minigame, power is 0 = Idle
-								currentStatus = "Idle"
-							end
+						-- If power is above 0, player is actively casting
+						if currentPower > 0 then
+							currentStatus = "Casting"
 						else
-							-- Fallback: if we can't check power, assume Idle when rod is equipped
+							-- Rod equipped, not in minigame, power is 0 = Idle
 							currentStatus = "Idle"
 						end
-
-						updateDisplays()
+					else
+						-- Fallback: if we can't check power, assume Idle when rod is equipped
+						currentStatus = "Idle"
 					end
-				end)
 
-				task.wait(0.1) -- Check every 0.1 seconds for responsive status updates
-			end
+					updateDisplays()
+				end
+			end)
 		end)
 	end
 
