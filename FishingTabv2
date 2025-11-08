@@ -1,11 +1,11 @@
-v-- Fishing Tab for FishClarityv2
--- Contains fishing features including Detector Stuck
+-- Fishing Tab for FishClarity
+-- Smart Detector feature for stuck detection and auto-reset
 
 return function(config)
 	local FishingTab = config.FishingTab
 	local Notifier = config.Notifier
-	
-	-- Services for Detector Stuck feature
+
+	-- Get required services and controllers
 	local Players = game:GetService("Players")
 	local RunService = game:GetService("RunService")
 	local VirtualInputManager = game:GetService("VirtualInputManager")
@@ -15,7 +15,7 @@ return function(config)
 	local player = Players.LocalPlayer
 	local replion = require(game.ReplicatedStorage.Packages.Replion).Client:WaitReplion("Data")
 
-	-- Controllers for Detector Stuck
+	-- Controllers
 	local FishingController
 	local AnimationController
 
@@ -24,23 +24,24 @@ return function(config)
 		AnimationController = require(ReplicatedStorage.Controllers.AnimationController)
 	end)
 
-	-- Remotes for Detector Stuck
+	-- Remotes
 	local finishRemote = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")
 		:WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):WaitForChild("RE/FishingCompleted")
 	local REEquipToolFromHotbar = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")
 		:WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):WaitForChild("RE/EquipToolFromHotbar")
 
-	-- Detector Stuck variables
-	local detectorEnabled = false
+	-- Smart Detector variables
+	local smartDetectorEnabled = false
 	local originalPosition = nil
 	local lastCastPosition = nil
 	local detectorTimer = 0
 	local waitTime = 15 -- default 15 seconds
 	local lastResetTime = 0
-	local RESET_COOLDOWN = 5
-	local statusLabels = {}
+	local RESET_COOLDOWN = 10
+	local currentStatus = "Inactive"
+	local timeDisplay, bagDisplay, statusDisplay
 
-	-- Detector Stuck Functions
+	-- Check if rod is equipped
 	local function isRodEquipped()
 		if replion then
 			local success, equippedType = pcall(function()
@@ -53,67 +54,51 @@ return function(config)
 		return false
 	end
 
-	local function getPlayerStatus()
-		if not FishingController then return "No Controller" end
-		
-		local currentGUID = FishingController:GetCurrentGUID()
-		if currentGUID then
-			return "Minigame Active"
-		end
-		
-		if isRodEquipped() then
-			return "Rod Equipped"
-		end
-		
-		return "Idle"
-	end
-
-	local function updateBagStatus()
+	-- Get player bag/fish count (simplified)
+	local function getBagCount()
 		if replion then
 			local success, bagData = pcall(function()
 				return replion:GetExpect("Bag")
 			end)
 			if success and bagData then
-				local fishCount = 0
+				local count = 0
 				for _, item in pairs(bagData) do
-					if item and item.Amount then
-						fishCount = fishCount + item.Amount
+					if item and item.Count then
+						count = count + item.Count
 					end
 				end
-				statusLabels.bagLabel:SetText("Bag: " .. fishCount .. " fish")
-			else
-				statusLabels.bagLabel:SetText("Bag: Empty")
+				return count
 			end
-		else
-			statusLabels.bagLabel:SetText("Bag: Unknown")
+		end
+		return 0
+	end
+
+	-- Update status displays
+	local function updateDisplays()
+		if timeDisplay then
+			timeDisplay:SetContent(string.format("Timer: %d", math.ceil(detectorTimer)))
+		end
+		if bagDisplay then
+			bagDisplay:SetContent(string.format("Bag: %d", getBagCount()))
+		end
+		if statusDisplay then
+			statusDisplay:SetContent("Status: " .. currentStatus)
 		end
 	end
 
+	-- Reset character
 	local function resetCharacter()
-		if not detectorEnabled then return end
-		
-		local currentTime = tick()
-		if (currentTime - lastResetTime) < RESET_COOLDOWN then
-			return -- Still in cooldown
-		end
-		
-		lastResetTime = currentTime
-		
-		Notifier.new({
-			Title = "Detector Reset",
-			Content = "Player stuck detected - resetting character",
-			Duration = 3,
-			Icon = "rbxassetid://95448792622941"
-		})
-		
+		if not player.Character then return end
+
+		lastResetTime = tick()
+		currentStatus = "Resetting..."
+
 		pcall(function()
-			if player.Character then
-				player.Character:BreakJoints()
-			end
+			player.Character:BreakJoints()
 		end)
-		
-		task.wait(5) -- Wait for respawn
-		
+
+		task.wait(5)
+
 		-- Teleport back to original position
 		if originalPosition and player.Character then
 			local hrp = player.Character:FindFirstChild("HumanoidRootPart")
@@ -122,117 +107,237 @@ return function(config)
 				task.wait(0.5)
 			end
 		end
-		
+
 		-- Re-equip rod
 		pcall(function() REEquipToolFromHotbar:FireServer(1) end)
 		task.wait(2)
-		
-		-- Update position
+
+		currentStatus = "Ready"
+		updateDisplays()
+	end
+
+	-- Smart detector main loop
+	local function startSmartDetector()
+		if not FishingController then
+			Notifier.new({
+				Title = "Error",
+				Content = "FishingController not found!",
+				Duration = 3,
+				Icon = "rbxassetid://124426992222665"
+			})
+			return
+		end
+
+		if not isRodEquipped() then
+			Notifier.new({
+				Title = "Error",
+				Content = "No fishing rod equipped!",
+				Duration = 3,
+				Icon = "rbxassetid://124426992222665"
+			})
+			return
+		end
+
+		smartDetectorEnabled = true
+		detectorTimer = waitTime
+
+		-- Save original position
 		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
 			originalPosition = player.Character.HumanoidRootPart.Position
 			lastCastPosition = originalPosition
 		end
-		
-		detectorTimer = 0 -- Reset timer
-	end
 
-	local function startDetectorLoop()
+		currentStatus = "Active"
+		updateDisplays()
+
+		Notifier.new({
+			Title = "Smart Detector",
+			Content = "Started monitoring fishing activity",
+			Duration = 3,
+			Icon = "rbxassetid://95448792622941"
+		})
+
+		-- Timer countdown loop
 		task.spawn(function()
-			while detectorEnabled do
-				pcall(function()
-					-- Update status labels
-					statusLabels.timeLabel:SetText("Time: " .. math.floor(detectorTimer) .. "s / " .. waitTime .. "s")
-					statusLabels.statusLabel:SetText("Status: " .. getPlayerStatus())
-					updateBagStatus()
-					
-					-- Check if player completed a fish (reset timer)
-					local currentGUID = FishingController and FishingController:GetCurrentGUID()
-					if not currentGUID and detectorTimer > 0 then
-						-- Player finished minigame, reset timer
-						detectorTimer = 0
-					end
-					
-					-- Increment timer
-					detectorTimer = detectorTimer + 0.1
-					
-					-- Check if timer exceeded wait time
-					if detectorTimer >= waitTime then
+			while smartDetectorEnabled do
+				task.wait(1)
+				detectorTimer = detectorTimer - 1
+				updateDisplays()
+
+				if detectorTimer <= 0 then
+					if (tick() - lastResetTime) >= RESET_COOLDOWN then
+						Notifier.new({
+							Title = "Smart Detector",
+							Content = "Timer expired - resetting character",
+							Duration = 3,
+							Icon = "rbxassetid://95448792622941"
+						})
 						resetCharacter()
+						detectorTimer = waitTime
+					else
+						detectorTimer = waitTime
 					end
-					
-					-- Update original position if player moved while fishing
-					if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-						local hrp = player.Character.HumanoidRootPart
-						if lastCastPosition then
-							local distance = (hrp.Position - lastCastPosition).Magnitude
-							if distance >= 10 then
-								originalPosition = hrp.Position
-								lastCastPosition = originalPosition
-							end
+				end
+			end
+		end)
+
+		-- Status monitoring loop
+		task.spawn(function()
+			local lastMinigameTime = nil
+
+			while smartDetectorEnabled do
+				pcall(function()
+					if not isRodEquipped() then
+						currentStatus = "No Rod"
+						task.wait(1)
+						return
+					end
+
+					local currentMinigameActive = FishingController:GetCurrentGUID() ~= nil
+
+					if currentMinigameActive then
+						currentStatus = "Minigame"
+
+						if not lastMinigameTime then
+							lastMinigameTime = tick()
+						end
+
+						local elapsed = tick() - lastMinigameTime
+
+						if elapsed >= 1.1 then
+							-- Complete the minigame
+							pcall(function() finishRemote:FireServer() end)
+							lastMinigameTime = nil
+
+							-- Reset timer since fish was completed
+							detectorTimer = waitTime
+							currentStatus = "Fish Caught"
+							updateDisplays()
+
+							Notifier.new({
+								Title = "Smart Detector",
+								Content = "Fish completed - timer reset",
+								Duration = 2,
+								Icon = "rbxassetid://95448792622941"
+							})
+
+							task.wait(1)
+							currentStatus = "Active"
+						end
+					else
+						if lastMinigameTime then
+							lastMinigameTime = nil
+						end
+
+						-- Check if casting
+						if FishingController._getPower and FishingController:_getPower() > 0 then
+							currentStatus = "Casting"
+						else
+							currentStatus = "Idle"
 						end
 					end
 				end)
+
 				task.wait(0.1)
+			end
+		end)
+
+		-- Position tracking loop
+		task.spawn(function()
+			while smartDetectorEnabled do
+				task.wait(2)
+				if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+					local hrp = player.Character.HumanoidRootPart
+
+					if lastCastPosition then
+						local distanceFromLastCast = (hrp.Position - lastCastPosition).Magnitude
+
+						if distanceFromLastCast >= 10 then
+							originalPosition = hrp.Position
+							lastCastPosition = originalPosition
+						end
+					elseif originalPosition then
+						local distance = (hrp.Position - originalPosition).Magnitude
+						if distance >= 10 then
+							originalPosition = hrp.Position
+							lastCastPosition = hrp.Position
+						end
+					else
+						originalPosition = hrp.Position
+						lastCastPosition = hrp.Position
+					end
+				end
 			end
 		end)
 	end
 
-	-- Fishing Features Section
+	local function stopSmartDetector()
+		smartDetectorEnabled = false
+		currentStatus = "Inactive"
+		updateDisplays()
+
+		Notifier.new({
+			Title = "Smart Detector",
+			Content = "Stopped monitoring",
+			Duration = 3,
+			Icon = "rbxassetid://95448792622941"
+		})
+	end
+
+	-- Create Fishing Features section
 	local FishingFeaturesSection = FishingTab:DrawSection({
 		Name = "Fishing Features",
 	});
 
-	-- Detector Stuck Status Labels
-	statusLabels.timeLabel = FishingFeaturesSection:AddLabel({
-		Name = "Time: 0s"
-	})
-	statusLabels.bagLabel = FishingFeaturesSection:AddLabel({
-		Name = "Bag: Empty"
-	})
-	statusLabels.statusLabel = FishingFeaturesSection:AddLabel({
-		Name = "Status: Idle"
-	})
+	-- Status displays
+	timeDisplay = FishingFeaturesSection:AddParagraph({
+		Title = "Time",
+		Content = "Timer: " .. detectorTimer
+	});
 
-	-- Smart Detector Toggle
+	bagDisplay = FishingFeaturesSection:AddParagraph({
+		Title = "Bag",
+		Content = "Bag: " .. getBagCount()
+	});
+
+	statusDisplay = FishingFeaturesSection:AddParagraph({
+		Title = "Status",
+		Content = "Status: " .. currentStatus
+	});
+
+	-- Smart Detector toggle
 	FishingFeaturesSection:AddToggle({
 		Name = "Smart Detector",
 		Default = false,
-		Callback = function(v)
-			detectorEnabled = v
-			if v then
-				-- Initialize detector
-				if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-					originalPosition = player.Character.HumanoidRootPart.Position
-					lastCastPosition = originalPosition
-				end
-				detectorTimer = 0
-				startDetectorLoop()
-				Notifier.new({
-					Title = "Smart Detector",
-					Content = "Detector enabled - monitoring fishing activity",
-					Duration = 3,
-					Icon = "rbxassetid://95448792622941"
-				})
+		Callback = function(enabled)
+			if enabled then
+				startSmartDetector()
 			else
-				detectorEnabled = false
-				Notifier.new({
-					Title = "Smart Detector",
-					Content = "Detector disabled",
-					Duration = 3,
-					Icon = "rbxassetid://95448792622941"
-				})
+				stopSmartDetector()
 			end
 		end,
 	});
 
-	-- Wait Time Slider
+	-- Wait Time slider
 	FishingFeaturesSection:AddSlider({
 		Name = "Wait Time",
 		Min = 10,
 		Max = 25,
 		Default = 15,
-		Callback = function(v)
-			waitTime = v
+		Round = 0,
+		Callback = function(value)
+			waitTime = value
+			if not smartDetectorEnabled then
+				detectorTimer = waitTime
+				updateDisplays()
+			end
+
+			Notifier.new({
+				Title = "Wait Time",
+				Content = "Set to " .. value .. " seconds",
+				Duration = 2,
+				Icon = "rbxassetid://95448792622941"
+			})
 		end,
 	});
 end
