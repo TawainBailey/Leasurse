@@ -1,4 +1,3 @@
--- GITHUB CONTAINER LOADING SYSTEM
 return function(config)
 	local FishingTab = config.FishingTab
 	local Notifier = config.Notifier
@@ -211,7 +210,7 @@ return function(config)
 
 						local elapsed = tick() - minigameStartTime
 
-						if elapsed >= shakeDelay then  -- Use shakeDelay for minigame completion time
+						if legitDelay > 0 and elapsed >= legitDelay then  -- Only fire remote if legitDelay > 0
 							pcall(function() finishRemote:FireServer() end)
 							minigameStartTime = nil
 							task.wait(0.1)
@@ -279,7 +278,7 @@ return function(config)
 								end
 							end)
 						end
-						task.wait(legitDelay)  -- Use legitDelay between casts
+						task.wait(1.0)  -- Fixed delay between casts like in FishitNew.lua
 					else
 						task.wait(0.1)
 					end
