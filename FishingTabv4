@@ -1,6 +1,6 @@
 -- Fishing Tab for FishClarity
 -- Smart Detector feature for stuck detection and auto-reset
---v3
+--v6
 return function(config)
 	local FishingTab = config.FishingTab
 	local Notifier = config.Notifier
@@ -198,17 +198,7 @@ return function(config)
 				Title = "Error",
 				Content = "FishingController not found!",
 				Duration = 3,
-				Icon = "rbxassetid://124426992222665"
-			})
-			return
-		end
-
-		if not isRodEquipped() then
-			Notifier.new({
-				Title = "Error",
-				Content = "No fishing rod equipped!",
-				Duration = 3,
-				Icon = "rbxassetid://124426992222665"
+				Icon = "rbxassetid://95448792622941"
 			})
 			return
 		end
@@ -221,7 +211,7 @@ return function(config)
 		lastResetTime = 0
 		originalPosition = nil
 		lastCastPosition = nil
-		currentStatus = "Active"
+		currentStatus = isRodEquipped() and "Active" or "No Rod"
 
 		-- Save original position
 		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
@@ -237,7 +227,7 @@ return function(config)
 			bagDisplay:SetContent("Fish Caught: 0")
 		end
 		if statusDisplay then
-			statusDisplay:SetContent("Status: Active")
+			statusDisplay:SetContent("Status: " .. currentStatus)
 		end
 
 		Notifier.new({
@@ -255,22 +245,30 @@ return function(config)
 			local currentTime = tick()
 			if currentTime - lastTimerUpdate >= 1 then
 				lastTimerUpdate = currentTime
-				detectorTimer = detectorTimer + 1
-				updateDisplays()
+				
+				-- Only increment timer if rod is equipped
+				if isRodEquipped() then
+					detectorTimer = detectorTimer + 1
+					updateDisplays()
 
-				if detectorTimer >= waitTime then
-					if (tick() - lastResetTime) >= RESET_COOLDOWN then
-						Notifier.new({
-							Title = "Smart Detector",
-							Content = "Timer expired - resetting character",
-							Duration = 3,
-							Icon = "rbxassetid://95448792622941"
-						})
-						resetCharacter()
-						detectorTimer = 0
-					else
-						detectorTimer = 0
+					if detectorTimer >= waitTime then
+						if (tick() - lastResetTime) >= RESET_COOLDOWN then
+							Notifier.new({
+								Title = "Smart Detector",
+								Content = "Timer expired - resetting character",
+								Duration = 3,
+								Icon = "rbxassetid://95448792622941"
+							})
+							resetCharacter()
+							detectorTimer = 0
+						else
+							detectorTimer = 0
+						end
 					end
+				else
+					-- Reset timer if no rod equipped
+					detectorTimer = 0
+					updateDisplays()
 				end
 			end
 		end)
