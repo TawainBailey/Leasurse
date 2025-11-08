@@ -1,4 +1,4 @@
--- Fishing Tab for FishClarityv2
+v-- Fishing Tab for FishClarityv2
 -- Contains fishing features including Detector Stuck
 
 return function(config)
