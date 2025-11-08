@@ -1,6 +1,3 @@
--- Fishing Tab for FishClarity
--- Smart Detector feature for stuck detection and auto-reset
-
 return function(config)
 	local FishingTab = config.FishingTab
 	local Notifier = config.Notifier
