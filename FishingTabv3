@@ -1,4 +1,4 @@
--- Fishing Tab for FishClarityv4
+-- Fishing Tab for FishClarityv5
 -- Smart Detector feature for stuck detection and auto-reset
 
 return function(config)
@@ -90,90 +90,43 @@ return function(config)
 		end
 	end
 
-	-- Detect what player is doing/facing
-	local function detectPlayerActivity()
-		if not player.Character then return "No Character" end
-
-		local humanoidRootPart = player.Character:FindFirstChild("HumanoidRootPart")
-		local humanoid = player.Character:FindFirstChild("Humanoid")
-		if not humanoidRootPart or not humanoid then return "Invalid Character" end
-
-		-- Check if player is moving
-		if humanoid.MoveDirection.Magnitude > 0.1 then
-			return "Moving"
-		end
-
-		-- Check if facing water (basic water detection)
-		local lookVector = humanoidRootPart.CFrame.LookVector
-		local raycastParams = RaycastParams.new()
-		raycastParams.FilterDescendantsInstances = {player.Character}
-		raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-
-		local raycastResult = workspace:Raycast(humanoidRootPart.Position, lookVector * 20, raycastParams)
-		if raycastResult then
-			local hitPart = raycastResult.Instance
-			if hitPart and hitPart:IsA("Terrain") then
-				local material = workspace.Terrain:GetMaterial(raycastResult.Position)
-				if material == Enum.Material.Water then
-					return "Facing Water"
-				end
-			elseif hitPart and hitPart.Name:lower():find("water") then
-				return "Facing Water"
-			end
-		end
-
-		-- Check if swimming
-		if humanoid:GetState() == Enum.HumanoidStateType.Swimming then
-			return "Swimming"
-		end
-
-		-- Check if jumping
-		if humanoid:GetState() == Enum.HumanoidStateType.Jumping then
-			return "Jumping"
-		end
-
-		-- Check if sitting
-		if humanoid.Sit then
-			return "Sitting"
-		end
-
-		return "Standing Still"
-	end
-
 	-- Reset character
 	local function resetCharacter()
 		if not player.Character then return end
 
-		-- Save current position before reset
-		local currentPosition = nil
-		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-			currentPosition = player.Character.HumanoidRootPart.Position
-		end
-
 		lastResetTime = tick()
 		currentStatus = "Resetting..."
+		updateDisplays()
 
+		-- Save current position RIGHT BEFORE resetting
+		local savedPosition = nil
+		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			savedPosition = player.Character.HumanoidRootPart.Position
+		end
+
+		-- Reset character
 		pcall(function()
 			player.Character:BreakJoints()
 		end)
 
-		task.wait(5)
+		-- Wait for respawn
+		task.wait(2)
 
-		-- Teleport back to saved position (where player was before reset)
-		if currentPosition and player.Character then
+		-- Teleport back to saved position
+		if savedPosition and player.Character then
 			local hrp = player.Character:FindFirstChild("HumanoidRootPart")
 			if hrp then
-				hrp.CFrame = CFrame.new(currentPosition)
-				task.wait(2) -- Wait 2 seconds as requested
-
-				-- Re-equip rod
-				pcall(function() REEquipToolFromHotbar:FireServer(1) end)
-				task.wait(2)
-
-				currentStatus = "Ready"
-				updateDisplays()
+				hrp.CFrame = CFrame.new(savedPosition)
+				task.wait(0.5)
 			end
 		end
+
+		-- Re-equip rod
+		pcall(function() REEquipToolFromHotbar:FireServer(1) end)
+		task.wait(2)
+
+		currentStatus = "Ready"
+		updateDisplays()
 	end
 
 	-- Stop Smart Detector and reset all variables
@@ -320,46 +273,27 @@ return function(config)
 							lastMinigameTime = nil
 						end
 
-						-- Enhanced status detection with player activity
-						local playerActivity = detectPlayerActivity()
-						local statusPrefix = ""
-
+						-- Simple status detection: if rod equipped and not in minigame, check if casting
 						if FishingController._getPower then
 							local currentPower = FishingController:_getPower()
 
 							-- If power is above 0, player is actively casting
 							if currentPower > 0 then
-								statusPrefix = "Casting"
+								currentStatus = "Casting"
 							else
 								-- Rod equipped, not in minigame, power is 0 = Idle
-								statusPrefix = "Idle"
+								currentStatus = "Idle"
 							end
 						else
 							-- Fallback: if we can't check power, assume Idle when rod is equipped
-							statusPrefix = "Idle"
+							currentStatus = "Idle"
 						end
 
-						-- Combine fishing status with player activity
-						currentStatus = statusPrefix .. " (" .. playerActivity .. ")"
 						updateDisplays()
 					end
 				end)
 
 				task.wait(0.1) -- Check every 0.1 seconds for responsive status updates
-			end
-		end)
-
-		-- Position tracking loop - update last cast position for reference
-		task.spawn(function()
-			while smartDetectorEnabled do
-				task.wait(1) -- Check every second
-				if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-					local hrp = player.Character.HumanoidRootPart
-					local currentPos = hrp.Position
-
-					-- Update last cast position for reference (originalPosition is saved before reset)
-					lastCastPosition = currentPos
-				end
 			end
 		end)
 	end
