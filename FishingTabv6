@@ -1,3 +1,6 @@
+-- Fishing Tab for FishClarity
+-- Smart Detector feature for stuck detection and auto-reset
+
 return function(config)
 	local FishingTab = config.FishingTab
 	local Notifier = config.Notifier
@@ -254,10 +257,21 @@ return function(config)
 						end
 
 						local attempts = 0
+						local previousPower = 0
+						local increasing = true
+						
 						repeat
 							task.wait(0.01)
+							local currentPower = FishingController:_getPower()
 							attempts += 1
-						until FishingController:_getPower() >= 0.92 or attempts >= 80 or not legitAutoFishEnabled
+							
+							-- Detect when power starts decreasing (peak reached)
+							if currentPower < previousPower then
+								increasing = false
+							end
+							
+							previousPower = currentPower
+						until (not increasing and currentPower >= 0.85) or attempts >= 80 or not legitAutoFishEnabled
 
 						if legitAutoFishEnabled and FishingController:_getPower() >= 0.5 then
 							pcall(function()
