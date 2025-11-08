@@ -1,6 +1,6 @@
 -- Fishing Tab for FishClarity
 -- Smart Detector feature for stuck detection and auto-reset
----2
+
 return function(config)
 	local FishingTab = config.FishingTab
 	local Notifier = config.Notifier
@@ -113,6 +113,19 @@ return function(config)
 	local autoUnfavoriteEnabled = false
 	local favoriteConnection = nil
 	local unfavoriteConnection = nil
+
+	-- EVENT FISHING VARIABLES
+	-- ============================================
+	local selectedEvents = {}
+	local eventTeleportEnabled = false
+	local eventCheckConnection = nil
+	local originalEventPosition = nil
+	local currentEventActive = nil
+	local eventPlatform = nil
+	local lastEventCheck = 0
+	local prioritizedEvent = nil
+	local playerFrozenForEvent = false
+	local eventBodyPosition = nil
 
 	-- Check if rod is equipped
 	local function isRodEquipped()
@@ -1285,6 +1298,102 @@ return function(config)
 	});
 
 	-- ============================================
+	-- EVENT FISHING SECTION
+	-- ============================================
+
+	local EventSection = FishingTab:DrawSection({
+		Name = "Event Fishing"
+	});
+
+	local EventDropdown = EventSection:AddDropdown({
+		Name = "Select Events",
+		Default = {},
+		Multi = true,
+		Values = {"Ghost Shark Hunt", "Megalodon Hunt", "Shark Hunt"},
+		Callback = function(Value)
+			selectedEvents = Value
+		end,
+	});
+
+	EventSection:AddButton({
+		Name = "Clear Events",
+		Callback = function()
+			selectedEvents = {}
+			if EventDropdown and EventDropdown.SetValue then
+				EventDropdown:SetValue({})
+			end
+			Notifier.new({
+				Title = "Cleared",
+				Content = "Event selection cleared",
+				Duration = 2,
+				Icon = "rbxassetid://95448792622941"
+			});
+		end,
+	});
+
+	local PrioritizeDropdown = EventSection:AddDropdown({
+		Name = "Prioritize Event",
+		Default = "Ghost Shark Hunt",
+		Values = {"Ghost Shark Hunt", "Megalodon Hunt", "Shark Hunt"},
+		Callback = function(Value)
+			prioritizedEvent = Value
+		end,
+	});
+
+	EventSection:AddButton({
+		Name = "Clear Priority",
+		Callback = function()
+			prioritizedEvent = nil
+			if PrioritizeDropdown and PrioritizeDropdown.SetValue then
+				PrioritizeDropdown:SetValue(nil)
+			end
+			Notifier.new({
+				Title = "Cleared",
+				Content = "Priority event cleared",
+				Duration = 2,
+				Icon = "rbxassetid://95448792622941"
+			});
+		end,
+	});
+
+	EventSection:AddToggle({
+		Name = "Auto Event Teleport",
+		Default = false,
+		Callback = function(Value)
+			eventTeleportEnabled = Value
+			
+			if Value then
+				if not selectedEvents or (type(selectedEvents) == "table" and next(selectedEvents) == nil) then
+					Notifier.new({
+						Title = "No Events Selected",
+						Content = "Please select at least one event",
+						Duration = 3,
+						Icon = "rbxassetid://95448792622941"
+					});
+					eventTeleportEnabled = false
+					return
+				end
+				
+				startEventTeleport()
+				Notifier.new({
+					Title = "Auto Event Enabled",
+					Content = "Will teleport to selected events",
+					Duration = 3,
+					Icon = "rbxassetid://95448792622941"
+				});
+			else
+				stopEventTeleport()
+				Notifier.new({
+					Title = "Auto Event Disabled",
+					Content = "Event teleportation stopped",
+					Duration = 2,
+					Icon = "rbxassetid://95448792622941"
+				});
+			end
+		end,
+	});
+
+	-- ============================================
 	-- FAVORITE SECTION
 	-- ============================================
 
@@ -1540,6 +1649,291 @@ return function(config)
 			unfavoriteAllFish()
 		end,
 	});
+
+	-- Event Functions
+	local function findEventPart(eventName)
+		local workspace = game:GetService("Workspace")
+		local menuRings = workspace:FindFirstChild("!!! MENU RINGS")
+		if not menuRings then
+			return nil
+		end
+		
+		for _, props in ipairs(menuRings:GetChildren()) do
+			if props.Name == "Props" then
+				local eventFolder = props:FindFirstChild(eventName)
+				if eventFolder then
+					local part = eventFolder:FindFirstChild("Part") or eventFolder:FindFirstChild(eventName)
+					if part and part:IsA("BasePart") then
+						return part
+					end
+				end
+			end
+		end
+		
+		return nil
+	end
+
+	local function freezePlayerForEvent()
+		if not playerFrozenForEvent then return end -- Don't freeze if we're supposed to be unfrozen
+		
+		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			local hrp = player.Character.HumanoidRootPart
+			
+			if eventBodyPosition then
+				eventBodyPosition:Destroy()
+			end
+			
+			eventBodyPosition = Instance.new("BodyPosition")
+			eventBodyPosition.Position = hrp.Position
+			eventBodyPosition.MaxForce = Vector3.new(10000, 10000, 10000) -- Increased from 4000 to 10000
+			eventBodyPosition.D = 2000 -- Increased from 1000 to 2000
+			eventBodyPosition.P = 25000 -- Increased from 10000 to 25000
+			eventBodyPosition.Parent = hrp
+			
+			playerFrozenForEvent = true
+		end
+	end
+
+	local function unfreezePlayerForEvent()
+		-- Destroy the main event body position
+		if eventBodyPosition then
+			pcall(function()
+				eventBodyPosition:Destroy()
+			end)
+			eventBodyPosition = nil
+		end
+		
+		-- Destroy any BodyPosition on the player's HumanoidRootPart
+		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			local hrp = player.Character.HumanoidRootPart
+			for _, constraint in ipairs(hrp:GetChildren()) do
+				if constraint:IsA("BodyPosition") then
+					pcall(function()
+						constraint:Destroy()
+					end)
+				end
+			end
+		end
+		
+		playerFrozenForEvent = false
+	end
+
+	local function teleportToEvent(eventPart, eventName)
+		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			local hrp = player.Character.HumanoidRootPart
+			local targetPosition = eventPart.Position + Vector3.new(0, 7, 0)
+			
+			if not originalEventPosition then
+				originalEventPosition = hrp.Position
+			end
+			
+			if eventPlatform then
+				eventPlatform:Destroy()
+			end
+			
+			eventPlatform = Instance.new("Part")
+			eventPlatform.Size = Vector3.new(10, 1, 10)
+			eventPlatform.Transparency = 1
+			eventPlatform.Anchored = true
+			eventPlatform.CanCollide = true
+			eventPlatform.Position = targetPosition
+			eventPlatform.Parent = workspace
+			
+			task.wait(0.1)
+			hrp.CFrame = CFrame.new(targetPosition + Vector3.new(0, 3, 0))
+			
+			task.wait(0.3)
+			pcall(function()
+				REEquipToolFromHotbar:FireServer(1)
+			end)
+			
+			task.wait(0.5)
+			
+			currentEventActive = eventName
+			playerFrozenForEvent = true
+			freezePlayerForEvent()
+			StartLegitAutoFish()
+			
+			return true
+		end
+		return false
+	end
+
+	local function returnPlayerToOriginal()
+		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			local hrp = player.Character.HumanoidRootPart
+			
+			if eventPlatform then
+				eventPlatform:Destroy()
+				eventPlatform = nil
+			end
+			
+			if originalEventPosition then
+				hrp.CFrame = CFrame.new(originalEventPosition)
+				originalEventPosition = nil
+			end
+			
+			task.wait(0.5)
+			
+			currentEventActive = nil
+			StopLegitAutoFish()
+			unfreezePlayerForEvent()
+			
+			Notifier.new({
+				Title = "Event Teleport",
+				Content = "Returned to original position",
+				Duration = 2,
+				Icon = "rbxassetid://95448792622941"
+			})
+		end
+	end
+
+	local function checkForActiveEvents()
+		if not eventTeleportEnabled then return end
+		
+		local workspace = game:GetService("Workspace")
+		local menuRings = workspace:FindFirstChild("!!! MENU RINGS")
+		if not menuRings then return end
+		
+		local activeEvents = {}
+		for eventName, _ in pairs(selectedEvents) do
+			local eventPart = findEventPart(eventName)
+			if eventPart then
+				table.insert(activeEvents, {name = eventName, part = eventPart})
+			end
+		end
+		
+		if prioritizedEvent and not selectedEvents[prioritizedEvent] then
+			local eventPart = findEventPart(prioritizedEvent)
+			if eventPart then
+				table.insert(activeEvents, {name = prioritizedEvent, part = eventPart})
+			end
+		end
+		
+		if currentEventActive then
+			local stillActive = false
+			for _, event in ipairs(activeEvents) do
+				if event.name == currentEventActive then
+					stillActive = true
+					break
+				end
+			end
+			
+			if not stillActive then
+				StopLegitAutoFish()
+				unfreezePlayerForEvent()
+				
+				currentEventActive = nil
+				
+				Notifier.new({
+					Title = "Event Ended",
+					Content = "Event completed, checking for more...",
+					Duration = 2,
+					Icon = "rbxassetid://95448792622941"
+				})
+				
+				local prioritizedActive = false
+				local prioritizedEventData = nil
+				if prioritizedEvent and selectedEvents[prioritizedEvent] then
+					for _, event in ipairs(activeEvents) do
+						if event.name == prioritizedEvent then
+							prioritizedActive = true
+							prioritizedEventData = event
+							break
+						end
+					end
+				end
+				
+				if prioritizedActive then
+					teleportToEvent(prioritizedEventData.part, prioritizedEventData.name)
+					Notifier.new({
+						Title = "Event Teleport",
+						Content = "Teleported to prioritized " .. prioritizedEventData.name,
+						Duration = 3,
+						Icon = "rbxassetid://95448792622941"
+					})
+				elseif #activeEvents > 0 then
+					local randomEvent = activeEvents[math.random(1, #activeEvents)]
+					teleportToEvent(randomEvent.part, randomEvent.name)
+					
+					Notifier.new({
+						Title = "Event Teleport",
+						Content = "Teleported to " .. randomEvent.name,
+						Duration = 3,
+						Icon = "rbxassetid://95448792622941"
+					})
+				else
+					returnPlayerToOriginal()
+				end
+			end
+		else
+			if #activeEvents > 0 then
+				local prioritizedActive = false
+				local prioritizedEventData = nil
+				if prioritizedEvent and selectedEvents[prioritizedEvent] then
+					for _, event in ipairs(activeEvents) do
+						if event.name == prioritizedEvent then
+							prioritizedActive = true
+							prioritizedEventData = event
+							break
+						end
+					end
+				end
+				
+				if prioritizedActive then
+					teleportToEvent(prioritizedEventData.part, prioritizedEventData.name)
+					Notifier.new({
+						Title = "Event Teleport",
+						Content = "Teleported to prioritized " .. prioritizedEventData.name,
+						Duration = 3,
+						Icon = "rbxassetid://95448792622941"
+					})
+				else
+					local randomEvent = activeEvents[math.random(1, #activeEvents)]
+					teleportToEvent(randomEvent.part, randomEvent.name)
+					
+					Notifier.new({
+						Title = "Event Teleport",
+						Content = "Teleported to " .. randomEvent.name,
+						Duration = 3,
+						Icon = "rbxassetid://95448792622941"
+					})
+				end
+			end
+		end
+	end
+
+	local function startEventTeleport()
+		if eventCheckConnection then
+			eventCheckConnection:Disconnect()
+		end
+		
+		eventCheckConnection = RunService.Heartbeat:Connect(function()
+			if eventTeleportEnabled then
+				local currentTime = tick()
+				if currentTime - lastEventCheck >= 2 then
+					checkForActiveEvents()
+					lastEventCheck = currentTime
+				end
+			end
+		end)
+	end
+
+	local function stopEventTeleport()
+		if eventCheckConnection then
+			eventCheckConnection:Disconnect()
+			eventCheckConnection = nil
+		end
+		
+		lastEventCheck = 0
+		
+		if eventPlatform then
+			eventPlatform:Destroy()
+			eventPlatform = nil
+		end
+		
+		returnPlayerToOriginal()
+	end
 
 	-- Favorite Functions
 	local function getFishInventory()
