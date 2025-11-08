@@ -1,4 +1,4 @@
--- Fishing Tab for FishClarity
+-- Fishing Tab for FishClarityv3
 -- Smart Detector feature for stuck detection and auto-reset
 
 return function(config)
@@ -14,6 +14,7 @@ return function(config)
 
 	local player = Players.LocalPlayer
 	local replion = require(game.ReplicatedStorage.Packages.Replion).Client:WaitReplion("Data")
+	local ItemUtility = require(ReplicatedStorage.Shared.ItemUtility)
 
 	-- Controllers
 	local FishingController
@@ -40,6 +41,7 @@ return function(config)
 	local RESET_COOLDOWN = 10
 	local currentStatus = "Inactive"
 	local timeDisplay, bagDisplay, statusDisplay
+	local lastFishCount = 0
 
 	-- Check if rod is equipped
 	local function isRodEquipped()
@@ -54,17 +56,18 @@ return function(config)
 		return false
 	end
 
-	-- Get player bag/fish count (simplified)
-	local function getBagCount()
+	-- Get fish count from inventory
+	local function getFishCount()
 		if replion then
-			local success, bagData = pcall(function()
-				return replion:GetExpect("Bag")
+			local success, items = pcall(function()
+				return replion:GetExpect({"Inventory", "Items"})
 			end)
-			if success and bagData then
+			if success and items then
 				local count = 0
-				for _, item in pairs(bagData) do
-					if item and item.Count then
-						count = count + item.Count
+				for _, item in ipairs(items) do
+					local itemData = ItemUtility.GetItemDataFromItemType("Items", item.Id)
+					if itemData and itemData.Data and itemData.Data.Type == "Fish" then
+						count = count + (item.Count or 1)
 					end
 				end
 				return count
@@ -76,10 +79,11 @@ return function(config)
 	-- Update status displays
 	local function updateDisplays()
 		if timeDisplay then
-			timeDisplay:SetContent(string.format("Timer: %d", math.ceil(detectorTimer)))
+			timeDisplay:SetContent(string.format("Timer: %d/%d", detectorTimer, waitTime))
 		end
 		if bagDisplay then
-			bagDisplay:SetContent(string.format("Bag: %d", getBagCount()))
+			local currentCount = getFishCount()
+			bagDisplay:SetContent(string.format("Fish: %d", currentCount))
 		end
 		if statusDisplay then
 			statusDisplay:SetContent("Status: " .. currentStatus)
@@ -139,7 +143,8 @@ return function(config)
 		end
 
 		smartDetectorEnabled = true
-		detectorTimer = waitTime
+		detectorTimer = 0 -- Start from 0
+		lastFishCount = getFishCount()
 
 		-- Save original position
 		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
@@ -161,10 +166,10 @@ return function(config)
 		task.spawn(function()
 			while smartDetectorEnabled do
 				task.wait(1)
-				detectorTimer = detectorTimer - 1
+				detectorTimer = detectorTimer + 1
 				updateDisplays()
 
-				if detectorTimer <= 0 then
+				if detectorTimer >= waitTime then
 					if (tick() - lastResetTime) >= RESET_COOLDOWN then
 						Notifier.new({
 							Title = "Smart Detector",
@@ -173,9 +178,9 @@ return function(config)
 							Icon = "rbxassetid://95448792622941"
 						})
 						resetCharacter()
-						detectorTimer = waitTime
+						detectorTimer = 0
 					else
-						detectorTimer = waitTime
+						detectorTimer = 0
 					end
 				end
 			end
@@ -209,20 +214,26 @@ return function(config)
 							pcall(function() finishRemote:FireServer() end)
 							lastMinigameTime = nil
 
-							-- Reset timer since fish was completed
-							detectorTimer = waitTime
-							currentStatus = "Fish Caught"
-							updateDisplays()
+							-- Check if fish was caught
+							task.wait(0.5)
+							local newFishCount = getFishCount()
+							if newFishCount > lastFishCount then
+								-- Fish was caught, reset timer
+								detectorTimer = 0
+								lastFishCount = newFishCount
+								currentStatus = "Fish Caught"
+								updateDisplays()
 
-							Notifier.new({
-								Title = "Smart Detector",
-								Content = "Fish completed - timer reset",
-								Duration = 2,
-								Icon = "rbxassetid://95448792622941"
-							})
+								Notifier.new({
+									Title = "Smart Detector",
+									Content = "Fish completed - timer reset",
+									Duration = 2,
+									Icon = "rbxassetid://95448792622941"
+								})
 
-							task.wait(1)
-							currentStatus = "Active"
+								task.wait(1)
+								currentStatus = "Active"
+							end
 						end
 					else
 						if lastMinigameTime then
@@ -292,12 +303,12 @@ return function(config)
 	-- Status displays
 	timeDisplay = FishingFeaturesSection:AddParagraph({
 		Title = "Time",
-		Content = "Timer: " .. detectorTimer
+		Content = "Timer: 0/" .. waitTime
 	});
 
 	bagDisplay = FishingFeaturesSection:AddParagraph({
 		Title = "Bag",
-		Content = "Bag: " .. getBagCount()
+		Content = "Fish: " .. getFishCount()
 	});
 
 	statusDisplay = FishingFeaturesSection:AddParagraph({
@@ -327,10 +338,8 @@ return function(config)
 		Round = 0,
 		Callback = function(value)
 			waitTime = value
-			if not smartDetectorEnabled then
-				detectorTimer = waitTime
-				updateDisplays()
-			end
+			-- Don't update timer here, just change the selected time
+			updateDisplays()
 
 			Notifier.new({
 				Title = "Wait Time",
