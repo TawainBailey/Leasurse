@@ -1,0 +1,7 @@
+-- Fishing Tab for FishClarity
+-- Empty for now, will add features gradually
+
+return function(config)
+	-- Fishing tab is currently empty
+	-- Will add sections and features as needed
+end
