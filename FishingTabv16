@@ -1,6 +1,3 @@
--- Fishing Tab for FishClarity
--- Smart Detector feature for stuck detection and auto-reset
-
 return function(config)
 	local FishingTab = config.FishingTab
 	local Notifier = config.Notifier
@@ -1231,64 +1228,130 @@ return function(config)
 		Name = "Favorite",
 	});
 
-	local FishNamesDropdown = FavoriteSection:AddDropdown({
-		Name = "Favorite By Name",
-		Default = {},
-		Multi = true,
-		Values = {
-			"Abyshorn Fish", "Abyss Seahorse", "Ancient Arapaima", "Ancient Relic Crocodile", "Ancient Whale",
-			"Angler Fish", "Armor Catfish", "Arowana", "Ash Basslet", "Astra Damsel", "Axolotl", "Azure Damsel",
-			"Baby Pumpkin Shark", "Ballina Angelfish", "Banded Butterfly", "Bandit Angelfish", "Barracuda Fish",
-			"Beanie Leedsicheye", "Blackcap Basslet", "Bleekers Damsel", "Blob Fish", "Blob Shark", "Blue Lobster",
-			"Blue-Banded Goby", "Blueflame Ray", "Blumato Clownfish", "Boa Angelfish", "Boar Fish", "Bone Whale",
-			"Bumblebee Grouper", "Candy Butterfly", "Candy Corn Eel", "Candycane Lobster", "Catfish", "Charmed Tang",
-			"Christmas Trophy 2024", "Christmastree Longnose", "Chrome Tuna", "Clownfish", "Coal Tang", "Coney Fish",
-			"Conspi Angelfish", "Copperband Butterfly", "Corazon Damsel", "Cow Clownfish", "Crocodile", "Crystal Crab",
-			"Crystal Salamander", "Dark Eel", "Dark Pumpkin Appafish", "Dark Tentacle", "Darwin Clownfish", "Dead Fish",
-			"Dead Scary Clownfish", "Dead Spooky Koi Fish", "Dead Zombie Shark", "Deep Sea Crab", "Domino Damsel",
-			"Dorhey Tang", "Dotted Stingray", "Drippy Tucanare", "Eerie Shark", "Electric Eel", "Elshark Gran Maja",
-			"Enchanted Angelfish", "Fade Tang", "Fangtooth", "Festive Goby", "Festive Pufferfish", "Fire Goby",
-			"Firecoal Damsel", "Flame Angelfish", "Flat Fish", "Flying Fish", "Frankenstein Longsnapper",
-			"Freshwater Piranha", "Frog", "Frostborn Shark", "Gar Fish", "Ghastly Crab", "Ghastly Hermit Crab",
-			"Ghost Shark", "Ghost Spiralfish", "Ghost Worm Fish", "Giant Squid", "Gingerbread Clownfish",
-			"Gingerbread Shark", "Gingerbread Tang", "Gingerbread Turtle", "Goliath Tiger", "Great Christmas Whale",
-			"Great Whale", "Greenbee Grouper", "Hammerhead Mummy", "Hammerhead Shark", "Hawks Turtle", "Hermit Crab",
-			"Herring Fish", "Hybodus Shark", "Jellyfish", "Jennifer Dottyback", "Jewel Tang", "Kau Cardinal",
-			"King Crab", "King Jelly", "King Mackerel", "Korean Angelfish", "Lake Sturgeon", "Lava Butterfly",
-			"Lavafin Tuna", "Lined Cardinal Fish", "Lion Fish", "Lobster", "Lochness Monster", "Loggerhead Turtle",
-			"Longnose Butterfly", "Loving Shark", "Luminous Fish", "Magic Tang", "Magma Goby", "Magma Shark",
-			"Mammoth Appafish", "Manoai Statue Fish", "Manta Ray", "Maroon Butterfly", "Masked Angelfish",
-			"Maze Angelfish", "Megalodon", "Mistletoe Damsel", "Monk Fish", "Monster Shark", "Moorish Idol",
-			"Mosasaur Shark", "Mossy Fishlet", "Mossy Vampire Fish", "Narwhal", "Orange Basslet", "Orangy Goby",
-			"Orca", "Panther Eel", "Panther Grouper", "Parrot Fish", "Patriot Tang", "Pilot Fish", "Pink Dolphin",
-			"Pink Smith Damsel", "Plasma Shark", "Prismy Seahorse", "Pufferfish", "Pumpkin Angler Fish",
-			"Pumpkin Butterfly Fish", "Pumpkin Carved Shark", "Pumpkin Hermit Crab", "Pumpkin Jellyfish",
-			"Pumpkin Ray", "Pumpkin StoneTurtle", "Pygmy Goby", "Queen Crab", "Racoon Butterfly Fish", "Red Goatfish",
-			"Red Snapper", "Reef Chromis", "Robot Kraken", "Rockfish", "Rockform Cardianl", "Runic Wispeye",
-			"Sacred Guardian Squid", "Sail Fish", "Sail Tang", "Salmon", "Saw Fish", "Scare", "Scary Clownfish",
-			"Scissortail Dartfish", "Sharp One", "Sheepshead Fish", "Shrimp Goby", "Silver Tuna",
-			"Skeleton Angler Fish", "Skeleton Fish", "Skeleton Narwhal", "Skunk Tilefish", "Slurpfish Chromis",
-			"Spear Guardian", "Specked Butterfly", "Spooky Koi Fish", "Spooky Peafish", "Spotted Lantern Fish",
-			"Starfish", "Starjam Tang", "Strawberry Dotty", "Strippled Seahorse", "Sushi Cardinal", "Swordfish",
-			"Synodontis", "Talon Serpent", "Temple Spokes Tuna", "Thin Armor Shark", "Thresher Shark",
-			"Toxic Jellyfish", "Tricolore Butterfly", "Unicorn Tang", "Vampire Squid", "Vintage Blue Tang",
-			"Vintage Damsel", "Viperangler Fish", "Viperfish", "Volcanic Basslet", "Volsail Tang", "Wahoo",
-			"Watanabei Angelfish", "Water Snake", "Waveback Fish", "White Clownfish", "White Tang", "Wild Serpent",
-			"Witch Fish", "Witch Koi Fish", "Wizard Stingray", "Worm Fish", "Wraithfin Abyssal", "Yello Damselfish",
-			"Yellowfin Tuna", "Yellowstate Angelfish", "Zebra Snakehead", "Zombie Megalodon", "Zombie Shark",
-			"Zoster Butterfly"
-		},
-		Callback = function(Value)
-			selectedFishNames = Value
-		end,
-	});
+	-- Function to create a searchable dropdown
+	local function createSearchableDropdown(section, name, allValues, callback)
+		local selectedValues = {}
+		local dropdown -- Forward declare
+
+		-- Create a text box for search input
+		local searchBox = section:AddTextBox({
+			Name = name .. " Search",
+			Default = "",
+			Placeholder = "Type to search...",
+			Callback = function(searchText)
+				-- Filter values based on search
+				local filteredValues = {}
+				if searchText and searchText ~= "" then
+					searchText = string.lower(searchText)
+					for _, value in ipairs(allValues) do
+						if string.lower(value):find(searchText, 1, true) then
+							table.insert(filteredValues, value)
+						end
+					end
+				else
+					-- Show all values when search is empty
+					filteredValues = allValues
+				end
+
+				-- Update dropdown with filtered values
+				if dropdown and dropdown.SetValues then
+					dropdown:SetValues(filteredValues)
+				end
+			end,
+		});
+
+		-- Create a regular dropdown that we'll populate based on search
+		dropdown = section:AddDropdown({
+			Name = name,
+			Default = {},
+			Multi = true,
+			Values = allValues, -- Start with all values
+			Callback = function(Value)
+				selectedValues = Value
+				if callback then
+					callback(Value)
+				end
+			end,
+		});
+
+		-- Return the dropdown object for external access
+		return {
+			Dropdown = dropdown,
+			SearchBox = searchBox,
+			GetSelectedValues = function() return selectedValues end,
+			SetSelectedValues = function(values)
+				selectedValues = values
+				if dropdown and dropdown.SetValue then
+					dropdown:SetValue(values)
+				end
+			end,
+			ClearSelection = function()
+				selectedValues = {}
+				if dropdown and dropdown.SetValue then
+					dropdown:SetValue({})
+				end
+			end,
+			RefreshValues = function(newValues)
+				allValues = newValues or allValues
+				if dropdown and dropdown.SetValues then
+					dropdown:SetValues(allValues)
+				end
+			end
+		}
+	end
+
+	local FishNamesDropdown = createSearchableDropdown(FavoriteSection, "Favorite By Name", {
+		"Abyshorn Fish", "Abyss Seahorse", "Ancient Arapaima", "Ancient Relic Crocodile", "Ancient Whale",
+		"Angler Fish", "Armor Catfish", "Arowana", "Ash Basslet", "Astra Damsel", "Axolotl", "Azure Damsel",
+		"Baby Pumpkin Shark", "Ballina Angelfish", "Banded Butterfly", "Bandit Angelfish", "Barracuda Fish",
+		"Beanie Leedsicheye", "Blackcap Basslet", "Bleekers Damsel", "Blob Fish", "Blob Shark", "Blue Lobster",
+		"Blue-Banded Goby", "Blueflame Ray", "Blumato Clownfish", "Boa Angelfish", "Boar Fish", "Bone Whale",
+		"Bumblebee Grouper", "Candy Butterfly", "Candy Corn Eel", "Candycane Lobster", "Catfish", "Charmed Tang",
+		"Christmas Trophy 2024", "Christmastree Longnose", "Chrome Tuna", "Clownfish", "Coal Tang", "Coney Fish",
+		"Conspi Angelfish", "Copperband Butterfly", "Corazon Damsel", "Cow Clownfish", "Crocodile", "Crystal Crab",
+		"Crystal Salamander", "Dark Eel", "Dark Pumpkin Appafish", "Dark Tentacle", "Darwin Clownfish", "Dead Fish",
+		"Dead Scary Clownfish", "Dead Spooky Koi Fish", "Dead Zombie Shark", "Deep Sea Crab", "Domino Damsel",
+		"Dorhey Tang", "Dotted Stingray", "Drippy Tucanare", "Eerie Shark", "Electric Eel", "Elshark Gran Maja",
+		"Enchanted Angelfish", "Fade Tang", "Fangtooth", "Festive Goby", "Festive Pufferfish", "Fire Goby",
+		"Firecoal Damsel", "Flame Angelfish", "Flat Fish", "Flying Fish", "Frankenstein Longsnapper",
+		"Freshwater Piranha", "Frog", "Frostborn Shark", "Gar Fish", "Ghastly Crab", "Ghastly Hermit Crab",
+		"Ghost Shark", "Ghost Spiralfish", "Ghost Worm Fish", "Giant Squid", "Gingerbread Clownfish",
+		"Gingerbread Shark", "Gingerbread Tang", "Gingerbread Turtle", "Goliath Tiger", "Great Christmas Whale",
+		"Great Whale", "Greenbee Grouper", "Hammerhead Mummy", "Hammerhead Shark", "Hawks Turtle", "Hermit Crab",
+		"Herring Fish", "Hybodus Shark", "Jellyfish", "Jennifer Dottyback", "Jewel Tang", "Kau Cardinal",
+		"King Crab", "King Jelly", "King Mackerel", "Korean Angelfish", "Lake Sturgeon", "Lava Butterfly",
+		"Lavafin Tuna", "Lined Cardinal Fish", "Lion Fish", "Lobster", "Lochness Monster", "Loggerhead Turtle",
+		"Longnose Butterfly", "Loving Shark", "Luminous Fish", "Magic Tang", "Magma Goby", "Magma Shark",
+		"Mammoth Appafish", "Manoai Statue Fish", "Manta Ray", "Maroon Butterfly", "Masked Angelfish",
+		"Maze Angelfish", "Megalodon", "Mistletoe Damsel", "Monk Fish", "Monster Shark", "Moorish Idol",
+		"Mosasaur Shark", "Mossy Fishlet", "Mossy Vampire Fish", "Narwhal", "Orange Basslet", "Orangy Goby",
+		"Orca", "Panther Eel", "Panther Grouper", "Parrot Fish", "Patriot Tang", "Pilot Fish", "Pink Dolphin",
+		"Pink Smith Damsel", "Plasma Shark", "Prismy Seahorse", "Pufferfish", "Pumpkin Angler Fish",
+		"Pumpkin Butterfly Fish", "Pumpkin Carved Shark", "Pumpkin Hermit Crab", "Pumpkin Jellyfish",
+		"Pumpkin Ray", "Pumpkin StoneTurtle", "Pygmy Goby", "Queen Crab", "Racoon Butterfly Fish", "Red Goatfish",
+		"Red Snapper", "Reef Chromis", "Robot Kraken", "Rockfish", "Rockform Cardianl", "Runic Wispeye",
+		"Sacred Guardian Squid", "Sail Fish", "Sail Tang", "Salmon", "Saw Fish", "Scare", "Scary Clownfish",
+		"Scissortail Dartfish", "Sharp One", "Sheepshead Fish", "Shrimp Goby", "Silver Tuna",
+		"Skeleton Angler Fish", "Skeleton Fish", "Skeleton Narwhal", "Skunk Tilefish", "Slurpfish Chromis",
+		"Spear Guardian", "Specked Butterfly", "Spooky Koi Fish", "Spooky Peafish", "Spotted Lantern Fish",
+		"Starfish", "Starjam Tang", "Strawberry Dotty", "Strippled Seahorse", "Sushi Cardinal", "Swordfish",
+		"Synodontis", "Talon Serpent", "Temple Spokes Tuna", "Thin Armor Shark", "Thresher Shark",
+		"Toxic Jellyfish", "Tricolore Butterfly", "Unicorn Tang", "Vampire Squid", "Vintage Blue Tang",
+		"Vintage Damsel", "Viperangler Fish", "Viperfish", "Volcanic Basslet", "Volsail Tang", "Wahoo",
+		"Watanabei Angelfish", "Water Snake", "Waveback Fish", "White Clownfish", "White Tang", "Wild Serpent",
+		"Witch Fish", "Witch Koi Fish", "Wizard Stingray", "Worm Fish", "Wraithfin Abyssal", "Yello Damselfish",
+		"Yellowfin Tuna", "Yellowstate Angelfish", "Zebra Snakehead", "Zombie Megalodon", "Zombie Shark",
+		"Zoster Butterfly"
+	}, function(Value)
+		selectedFishNames = Value
+	end);
 
 	FavoriteSection:AddButton({
 		Name = "Clear Fish Names",
 		Callback = function()
 			selectedFishNames = {}
-			if FishNamesDropdown and FishNamesDropdown.SetValue then
-				FishNamesDropdown:SetValue({})
+			if FishNamesDropdown and FishNamesDropdown.ClearSelection then
+				FishNamesDropdown:ClearSelection()
 			end
 			Notifier.new({
 				Title = "Cleared",
