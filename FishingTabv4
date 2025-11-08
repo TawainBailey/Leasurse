@@ -1,6 +1,6 @@
 -- Fishing Tab for FishClarity
 -- Smart Detector feature for stuck detection and auto-reset
-
+--v2
 return function(config)
 	local FishingTab = config.FishingTab
 	local Notifier = config.Notifier
@@ -109,7 +109,25 @@ return function(config)
 			player.Character:BreakJoints()
 		end)
 
-		-- Wait for respawn
+		-- Wait for player to respawn (detect when character is added back)
+		local respawned = false
+		local connection
+		connection = player.CharacterAdded:Connect(function(newChar)
+			respawned = true
+			connection:Disconnect()
+		end)
+
+		-- Wait for respawn (max 10 seconds timeout)
+		local waitStart = tick()
+		while not respawned and (tick() - waitStart) < 10 do
+			task.wait(0.1)
+		end
+
+		if connection then
+			connection:Disconnect()
+		end
+
+		-- Wait 2 seconds after respawn finishes
 		task.wait(2)
 
 		-- Teleport back to saved position
@@ -138,7 +156,17 @@ return function(config)
 		currentStatus = "Inactive"
 		initialFishCount = 0
 		fishCaughtSinceStart = 0
-		updateDisplays()
+		
+		-- Force update displays to reset values
+		if timeDisplay then
+			timeDisplay:SetContent(string.format("Timer: 0/%d", waitTime))
+		end
+		if bagDisplay then
+			bagDisplay:SetContent("Fish Caught: 0")
+		end
+		if statusDisplay then
+			statusDisplay:SetContent("Status: Inactive")
+		end
 
 		Notifier.new({
 			Title = "Smart Detector",
@@ -170,11 +198,15 @@ return function(config)
 			return
 		end
 
-		-- Reset all variables
+		-- FULLY RESET all variables when starting
 		smartDetectorEnabled = true
-		detectorTimer = 0 -- Start from 0
+		detectorTimer = 0
 		initialFishCount = getTotalFishCount()
 		fishCaughtSinceStart = 0
+		lastResetTime = 0
+		originalPosition = nil
+		lastCastPosition = nil
+		currentStatus = "Active"
 
 		-- Save original position
 		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
@@ -182,8 +214,16 @@ return function(config)
 			lastCastPosition = originalPosition
 		end
 
-		currentStatus = "Active"
-		updateDisplays()
+		-- Force update all displays with fresh values
+		if timeDisplay then
+			timeDisplay:SetContent(string.format("Timer: 0/%d", waitTime))
+		end
+		if bagDisplay then
+			bagDisplay:SetContent("Fish Caught: 0")
+		end
+		if statusDisplay then
+			statusDisplay:SetContent("Status: Active")
+		end
 
 		Notifier.new({
 			Title = "Smart Detector",
