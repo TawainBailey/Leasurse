@@ -1,4 +1,4 @@
--- Fishing Tab for FishClarity
+-- Fishing Tab for FishClarityv2
 -- Contains fishing features including Detector Stuck
 
 return function(config)
@@ -183,9 +183,15 @@ return function(config)
 	});
 
 	-- Detector Stuck Status Labels
-	statusLabels.timeLabel = FishingFeaturesSection:AddLabel("Time: 0s")
-	statusLabels.bagLabel = FishingFeaturesSection:AddLabel("Bag: Empty")
-	statusLabels.statusLabel = FishingFeaturesSection:AddLabel("Status: Idle")
+	statusLabels.timeLabel = FishingFeaturesSection:AddLabel({
+		Name = "Time: 0s"
+	})
+	statusLabels.bagLabel = FishingFeaturesSection:AddLabel({
+		Name = "Bag: Empty"
+	})
+	statusLabels.statusLabel = FishingFeaturesSection:AddLabel({
+		Name = "Status: Idle"
+	})
 
 	-- Smart Detector Toggle
 	FishingFeaturesSection:AddToggle({
