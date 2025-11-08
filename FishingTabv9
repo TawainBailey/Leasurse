@@ -1,6 +1,3 @@
--- Fishing Tab for FishClarity
--- Smart Detector feature for stuck detection and auto-reset
-
 return function(config)
 	local FishingTab = config.FishingTab
 	local Notifier = config.Notifier
@@ -246,41 +243,17 @@ return function(config)
 						local checkPower = FishingController:_getPower()
 
 						-- Less strict check for power charging - allow small increases
-						if checkPower <= initialPower + 0.05 then
+						if checkPower <= initialPower + 0.01 then
 							task.wait(0.5)
 							return
 						end
 
-						-- Smart power timing with cooldown awareness and ping compensation
-						local ping = game:GetService("Stats"):GetStat("Data Ping")
-						local pingCompensation = math.min(ping / 1000 * 2, 0.1) -- Max 100ms compensation
-						local optimalCastTime = workspace:GetServerTimeNow() + 0.14 + pingCompensation -- Account for cooldown + ping
-						
 						local attempts = 0
-						local lastPower = 0
-						local powerIncreasing = true
-						
 						repeat
-							task.wait(0.005) -- More frequent checks for precision
+							task.wait(0.02)
 							local currentPower = FishingController:_getPower()
-							
-							if currentPower < lastPower then
-								powerIncreasing = false -- Peak detected, power is dropping
-							end
-							
-							-- Cast when: power is high enough OR we've reached optimal timing
-							local timeUntilCastReady = optimalCastTime - workspace:GetServerTimeNow()
-							local shouldCastNow = currentPower >= 0.95 or 
-												(timeUntilCastReady <= 0 and currentPower >= 0.8) or
-												(not powerIncreasing and currentPower >= 0.85) -- Cast at peak
-							
-							if shouldCastNow then
-								break
-							end
-							
-							lastPower = currentPower
 							attempts += 1
-						until attempts >= 100 or not legitAutoFishEnabled
+						until currentPower >= 0.92 or attempts >= 80 or not legitAutoFishEnabled
 
 						if legitAutoFishEnabled and FishingController:_getPower() >= 0.5 then
 							pcall(function()
