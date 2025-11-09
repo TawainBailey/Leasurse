@@ -77,7 +77,7 @@ return function(config)
 					Title = "Teleported",
 					Content = "Teleported to " .. selectedIsland,
 					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
+					Icon = "95448792622941"
 				})
 			end
 		end,
@@ -115,7 +115,7 @@ return function(config)
 					Title = "Teleported",
 					Content = "Teleported to " .. selectedRodShop,
 					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
+					Icon = "95448792622941"
 				})
 			end
 		end,
@@ -150,7 +150,7 @@ return function(config)
 					Title = "Teleported",
 					Content = "Teleported to " .. selectedBaitShop,
 					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
+					Icon = "95448792622941"
 				})
 			end
 		end,
@@ -189,7 +189,7 @@ return function(config)
 					Title = "Teleported",
 					Content = "Teleported to " .. selectedSellShop,
 					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
+					Icon = "95448792622941"
 				})
 			end
 		end,
@@ -228,7 +228,7 @@ return function(config)
 					Title = "Teleported",
 					Content = "Teleported to " .. selectedBoatSeller,
 					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
+					Icon = "95448792622941"
 				})
 			end
 		end,
@@ -301,7 +301,7 @@ return function(config)
 								Title = "Teleported",
 								Content = "Teleported to Alien Merchant",
 								Duration = 2,
-								Icon = "rbxassetid://124426992222665"
+								Icon = "95448792622941"
 							})
 						end
 					end
@@ -314,7 +314,7 @@ return function(config)
 						Title = "Teleported",
 						Content = "Teleported to " .. selectedNPC,
 						Duration = 2,
-						Icon = "rbxassetid://124426992222665"
+						Icon = "95448792622941"
 					})
 				end
 			end
@@ -357,14 +357,14 @@ return function(config)
 						Title = "Teleported",
 						Content = "Teleported to " .. selectedPlayer,
 						Duration = 2,
-						Icon = "rbxassetid://124426992222665"
+						Icon = "95448792622941"
 					})
 				else
 					Notifier.new({
 						Title = "Teleport Failed",
 						Content = "Player not found or has no character",
 						Duration = 2,
-						Icon = "rbxassetid://124426992222665"
+						Icon = "95448792622941"
 					})
 				end
 			else
@@ -372,7 +372,7 @@ return function(config)
 					Title = "No Player Selected",
 					Content = "Please select a player first",
 					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
+					Icon = "95448792622941"
 				})
 			end
 		end,
