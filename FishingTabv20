@@ -193,7 +193,7 @@ return function(config)
 				Title = "Error",
 				Content = "FishingController not found!",
 				Duration = 3,
-				Icon = "rbxassetid://95448792622941"
+				Icon = "95448792622941"
 			})
 			return
 		end
@@ -336,7 +336,7 @@ return function(config)
 						Title = "Legit Auto Fish",
 						Content = "Rod equipped, starting auto fish",
 						Duration = 3,
-						Icon = "rbxassetid://95448792622941"
+						Icon = "95448792622941"
 					})
 				end
 			end)
@@ -546,7 +546,7 @@ return function(config)
 				Title = "Error",
 				Content = "FishingController not found!",
 				Duration = 3,
-				Icon = "rbxassetid://95448792622941"
+				Icon = "95448792622941"
 			})
 			return
 		end
@@ -601,7 +601,7 @@ return function(config)
 								Title = "Smart Detector",
 								Content = "Timer expired - resetting character",
 								Duration = 3,
-								Icon = "rbxassetid://95448792622941"
+								Icon = "95448792622941"
 							})
 							resetCharacter()
 							detectorTimer = 0
@@ -783,7 +783,7 @@ return function(config)
 					Title = "Auto Sell",
 					Content = "Sold all items",
 					Duration = 2,
-					Icon = "rbxassetid://95448792622941"
+					Icon = "95448792622941"
 				})
 				sellNotificationCounter = 0
 			end
@@ -839,7 +839,7 @@ return function(config)
 			Title = "Unfavorite All",
 			Content = "Unfavorited " .. unfavoriteCount .. " fish",
 			Duration = 3,
-			Icon = "rbxassetid://95448792622941"
+			Icon = "95448792622941"
 		})
 	end
 
@@ -1117,7 +1117,7 @@ return function(config)
 
 	local AutoFishSection = FishingTab:DrawSection({
 		Name = "Auto Fish",
-		Icon = "rbxassetid://95448792622941"
+		Icon = "95448792622941"
 	});
 
 	-- Legit Auto Fish toggle
@@ -1131,7 +1131,7 @@ return function(config)
 					Title = "Legit Auto Fish",
 					Content = "Legit auto fish enabled",
 					Duration = 3,
-					Icon = "rbxassetid://95448792622941"
+					Icon = "95448792622941"
 				});
 			else
 				StopLegitAutoFish()
@@ -1139,7 +1139,7 @@ return function(config)
 					Title = "Legit Auto Fish",
 					Content = "Legit auto fish disabled",
 					Duration = 2,
-					Icon = "rbxassetid://95448792622941"
+					Icon = "95448792622941"
 				});
 			end
 		end,
@@ -1158,7 +1158,7 @@ return function(config)
 					Title = "Auto Equip Rod",
 					Content = "Auto Equip Rod enabled",
 					Duration = 3,
-					Icon = "rbxassetid://95448792622941"
+					Icon = "95448792622941"
 				});
 			else
 				stopAutoEquipRod()
@@ -1166,7 +1166,7 @@ return function(config)
 					Title = "Auto Equip Rod",
 					Content = "Auto Equip Rod disabled",
 					Duration = 2,
-					Icon = "rbxassetid://95448792622941"
+					Icon = "95448792622941"
 				});
 			end
 		end,
@@ -1185,7 +1185,7 @@ return function(config)
 					Title = "Auto Click Minigame",
 					Content = "Auto Click Minigame enabled",
 					Duration = 3,
-					Icon = "rbxassetid://95448792622941"
+					Icon = "95448792622941"
 				});
 			else
 				StopStandaloneAutoClickMinigame()
@@ -1193,7 +1193,7 @@ return function(config)
 					Title = "Auto Click Minigame",
 					Content = "Auto Click Minigame disabled",
 					Duration = 2,
-					Icon = "rbxassetid://95448792622941"
+					Icon = "95448792622941"
 				});
 			end
 		end,
@@ -1258,7 +1258,7 @@ return function(config)
 					Title = "Auto Sell Enabled",
 					Content = "Will auto-sell every " .. sellThreshold .. " seconds",
 					Duration = 3,
-					Icon = "rbxassetid://95448792622941"
+					Icon = "95448792622941"
 				});
 			else
 				stopAutoSell()
@@ -1266,7 +1266,7 @@ return function(config)
 					Title = "Auto Sell Disabled",
 					Content = "Auto sell turned off",
 					Duration = 2,
-					Icon = "rbxassetid://95448792622941"
+					Icon = "95448792622941"
 				});
 			end
 		end,
@@ -1292,7 +1292,7 @@ return function(config)
 				Title = "Sell All",
 				Content = "Sold all items",
 				Duration = 2,
-				Icon = "rbxassetid://95448792622941"
+				Icon = "95448792622941"
 			});
 		end,
 	});
@@ -1434,7 +1434,7 @@ return function(config)
 				Title = "Event Teleport",
 				Content = "Returned to original position",
 				Duration = 2,
-				Icon = "rbxassetid://95448792622941"
+				Icon = "95448792622941"
 			})
 		end
 	end
@@ -1480,7 +1480,7 @@ return function(config)
 					Title = "Event Ended",
 					Content = "Event completed, checking for more...",
 					Duration = 2,
-					Icon = "rbxassetid://95448792622941"
+					Icon = "95448792622941"
 				})
 				
 				local prioritizedActive = false
@@ -1501,7 +1501,7 @@ return function(config)
 						Title = "Event Teleport",
 						Content = "Teleported to prioritized " .. prioritizedEventData.name,
 						Duration = 3,
-						Icon = "rbxassetid://95448792622941"
+						Icon = "95448792622941"
 					})
 				elseif #activeEvents > 0 then
 					local randomEvent = activeEvents[math.random(1, #activeEvents)]
@@ -1511,7 +1511,7 @@ return function(config)
 						Title = "Event Teleport",
 						Content = "Teleported to " .. randomEvent.name,
 						Duration = 3,
-						Icon = "rbxassetid://95448792622941"
+						Icon = "95448792622941"
 					})
 				else
 					returnPlayerToOriginal()
@@ -1537,7 +1537,7 @@ return function(config)
 						Title = "Event Teleport",
 						Content = "Teleported to prioritized " .. prioritizedEventData.name,
 						Duration = 3,
-						Icon = "rbxassetid://95448792622941"
+						Icon = "95448792622941"
 					})
 				else
 					local randomEvent = activeEvents[math.random(1, #activeEvents)]
@@ -1547,7 +1547,7 @@ return function(config)
 						Title = "Event Teleport",
 						Content = "Teleported to " .. randomEvent.name,
 						Duration = 3,
-						Icon = "rbxassetid://95448792622941"
+						Icon = "95448792622941"
 					})
 				end
 			end
@@ -1611,7 +1611,7 @@ return function(config)
 				Title = "Cleared",
 				Content = "Event selection cleared",
 				Duration = 2,
-				Icon = "rbxassetid://95448792622941"
+				Icon = "95448792622941"
 			});
 		end,
 	});
@@ -1636,7 +1636,7 @@ return function(config)
 				Title = "Cleared",
 				Content = "Priority event cleared",
 				Duration = 2,
-				Icon = "rbxassetid://95448792622941"
+				Icon = "95448792622941"
 			});
 		end,
 	});
@@ -1653,7 +1653,7 @@ return function(config)
 						Title = "No Events Selected",
 						Content = "Please select at least one event",
 						Duration = 3,
-						Icon = "rbxassetid://95448792622941"
+						Icon = "95448792622941"
 					});
 					eventTeleportEnabled = false
 					return
@@ -1664,7 +1664,7 @@ return function(config)
 					Title = "Auto Event Enabled",
 					Content = "Will teleport to selected events",
 					Duration = 3,
-					Icon = "rbxassetid://95448792622941"
+					Icon = "95448792622941"
 				});
 			else
 				stopEventTeleport()
@@ -1672,7 +1672,7 @@ return function(config)
 					Title = "Auto Event Disabled",
 					Content = "Event teleportation stopped",
 					Duration = 2,
-					Icon = "rbxassetid://95448792622941"
+					Icon = "95448792622941"
 				});
 			end
 		end,
@@ -1815,7 +1815,7 @@ return function(config)
 				Title = "Cleared",
 				Content = "Fish names selection cleared",
 				Duration = 2,
-				Icon = "rbxassetid://95448792622941"
+				Icon = "95448792622941"
 			});
 		end,
 	});
@@ -1841,7 +1841,7 @@ return function(config)
 				Title = "Cleared",
 				Content = "Rarity selection cleared",
 				Duration = 2,
-				Icon = "rbxassetid://95448792622941"
+				Icon = "95448792622941"
 			});
 		end,
 	});
@@ -1871,7 +1871,7 @@ return function(config)
 				Title = "Cleared",
 				Content = "Variant selection cleared",
 				Duration = 2,
-				Icon = "rbxassetid://95448792622941"
+				Icon = "95448792622941"
 			});
 		end,
 	});
@@ -1888,7 +1888,7 @@ return function(config)
 					Title = "Auto Favorite Enabled",
 					Content = "Will auto-favorite matching fish",
 					Duration = 3,
-					Icon = "rbxassetid://95448792622941"
+					Icon = "95448792622941"
 				});
 			else
 				stopAutoFavorite()
@@ -1896,7 +1896,7 @@ return function(config)
 					Title = "Auto Favorite Disabled",
 					Content = "Auto favorite turned off",
 					Duration = 2,
-					Icon = "rbxassetid://95448792622941"
+					Icon = "95448792622941"
 				});
 			end
 		end,
@@ -1914,7 +1914,7 @@ return function(config)
 					Title = "Auto Unfavorite Enabled",
 					Content = "Will auto-unfavorite matching fish",
 					Duration = 3,
-					Icon = "rbxassetid://95448792622941"
+					Icon = "95448792622941"
 				});
 			else
 				stopAutoUnfavorite()
@@ -1922,7 +1922,7 @@ return function(config)
 					Title = "Auto Unfavorite Disabled",
 					Content = "Auto unfavorite turned off",
 					Duration = 2,
-					Icon = "rbxassetid://95448792622941"
+					Icon = "95448792622941"
 				});
 			end
 		end,
@@ -1976,7 +1976,7 @@ return function(config)
 			Title = "Unfavorite All",
 			Content = "Unfavorited " .. unfavoriteCount .. " fish",
 			Duration = 3,
-			Icon = "rbxassetid://95448792622941"
+			Icon = "95448792622941"
 		})
 	end
 
