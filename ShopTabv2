@@ -1,3 +1,7 @@
+-- Shop Container (Automatically Tab)
+-- This file contains all UI elements for the Shop/Automatically tab
+-- Includes: Merchant, Save Position, Fishing Rods, Baits, Utilities
+
 return function(config)
 	-- Extract dependencies
 	local ShopTab = config.ShopTab
@@ -85,7 +89,7 @@ return function(config)
 						Title = "Merchant",
 						Content = "Merchant GUI closed",
 						Duration = 2,
-						Icon = "rbxassetid://124426992222665"
+						Icon = "95448792622941"
 					})
 				else
 					GuiControl:Open("Merchant")
@@ -94,7 +98,7 @@ return function(config)
 						Title = "Merchant",
 						Content = "Merchant GUI opened",
 						Duration = 2,
-						Icon = "rbxassetid://124426992222665"
+						Icon = "95448792622941"
 					})
 				end
 			end)
@@ -168,7 +172,7 @@ return function(config)
 							Title = "Save Position",
 							Content = "Teleported to saved position",
 							Duration = 2,
-							Icon = "rbxassetid://124426992222665"
+							Icon = "95448792622941"
 						})
 					end
 				end)
@@ -187,7 +191,7 @@ return function(config)
 						Title = "Save Position",
 						Content = "Position saved successfully!",
 						Duration = 2,
-						Icon = "rbxassetid://124426992222665"
+						Icon = "95448792622941"
 					})
 				end
 			end)
@@ -203,7 +207,7 @@ return function(config)
 				Title = "Save Position",
 				Content = "Saved position has been reset",
 				Duration = 2,
-				Icon = "rbxassetid://124426992222665"
+				Icon = "95448792622941"
 			})
 		end,
 	});
@@ -269,7 +273,7 @@ return function(config)
 							Title = "Shop",
 							Content = "Purchased: " .. selectedRod,
 							Duration = 3,
-							Icon = "rbxassetid://124426992222665"
+							Icon = "95448792622941"
 						})
 					end
 				end)
@@ -278,7 +282,7 @@ return function(config)
 					Title = "Shop Error",
 					Content = "Please select a rod first",
 					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
+					Icon = "95448792622941"
 				})
 			end
 		end,
@@ -330,7 +334,7 @@ return function(config)
 							Title = "Shop",
 							Content = "Purchased: " .. selectedBobber,
 							Duration = 3,
-							Icon = "rbxassetid://124426992222665"
+							Icon = "95448792622941"
 						})
 					end
 				end)
@@ -339,7 +343,7 @@ return function(config)
 					Title = "Shop Error",
 					Content = "Please select a bait first",
 					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
+					Icon = "95448792622941"
 				})
 			end
 		end,
@@ -388,7 +392,7 @@ return function(config)
 							Title = "Shop",
 							Content = "Purchased: " .. selectedUtility,
 							Duration = 3,
-							Icon = "rbxassetid://124426992222665"
+							Icon = "95448792622941"
 						})
 					end
 				end)
@@ -397,7 +401,7 @@ return function(config)
 					Title = "Shop Error",
 					Content = "Please select a utility first",
 					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
+					Icon = "95448792622941"
 				})
 			end
 		end,
@@ -437,7 +441,7 @@ return function(config)
 						Title = "Shop",
 						Content = "Purchased Weather: " .. selectedWeather,
 						Duration = 3,
-						Icon = "rbxassetid://124426992222665"
+						Icon = "95448792622941"
 					})
 				end)
 			else
@@ -445,7 +449,7 @@ return function(config)
 					Title = "Shop Error",
 					Content = "Please select a weather first",
 					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
+					Icon = "95448792622941"
 				})
 			end
 		end,
@@ -493,7 +497,7 @@ return function(config)
 				Title = "Potions",
 				Content = "Potion selection cleared",
 				Duration = 2,
-				Icon = "rbxassetid://124426992222665"
+				Icon = "95448792622941"
 			})
 		end,
 	});
@@ -515,7 +519,7 @@ return function(config)
 						Title = "Auto Use Potions",
 						Content = "No potions selected. Please select at least one potion.",
 						Duration = 3,
-						Icon = "rbxassetid://124426992222665"
+						Icon = "95448792622941"
 					})
 					-- ensure toggle UI is turned off by caller if necessary
 					return
@@ -531,7 +535,7 @@ return function(config)
 						Title = "Auto Use Potions",
 						Content = "Could not acquire Net package for remotes",
 						Duration = 3,
-						Icon = "rbxassetid://124426992222665"
+						Icon = "95448792622941"
 					})
 					return
 				end
@@ -564,7 +568,7 @@ return function(config)
 												Title = "Auto Use Potions",
 												Content = "Used potion: " .. tostring(selectedName),
 												Duration = 2,
-												Icon = "rbxassetid://124426992222665"
+												Icon = "95448792622941"
 											})
 											didUse = true
 											task.wait(0.6)
@@ -579,7 +583,7 @@ return function(config)
 								Title = "Auto Use Potions",
 								Content = "No selected potions found in inventory",
 								Duration = 3,
-								Icon = "rbxassetid://124426992222665"
+								Icon = "95448792622941"
 							})
 						end
 					end)
@@ -602,7 +606,7 @@ return function(config)
 					Title = "Auto Use Potions",
 					Content = "Auto use enabled for selected potions",
 					Duration = 3,
-					Icon = "rbxassetid://124426992222665"
+					Icon = "95448792622941"
 				})
 			else
 				if potionAutoConnection then
@@ -613,7 +617,7 @@ return function(config)
 					Title = "Auto Use Potions",
 					Content = "Auto use disabled",
 					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
+					Icon = "95448792622941"
 				})
 			end
 		end,
@@ -684,7 +688,7 @@ return function(config)
 				-- clear selection; UI library may refresh options on its own
 				pcall(function() TotemDropdown:SetValue(nil) end)
 			end
-			Notifier.new({Title = "Totems", Content = "Refreshed totems (found " .. tostring(#totemValues) .. ")", Duration = 3, Icon = "rbxassetid://124426992222665"})
+			Notifier.new({Title = "Totems", Content = "Refreshed totems (found " .. tostring(#totemValues) .. ")", Duration = 3, Icon = "95448792622941"})
 		end,
 	})
 
@@ -693,12 +697,12 @@ return function(config)
 		Callback = function()
 			pcall(function()
 				if not selectedTotem or selectedTotem == "" then
-					Notifier.new({Title = "Totems", Content = "No totem selected", Duration = 3, Icon = "rbxassetid://124426992222665"})
+					Notifier.new({Title = "Totems", Content = "No totem selected", Duration = 3, Icon = "95448792622941"})
 					return
 				end
 				local handle = totemMap and totemMap[selectedTotem]
 				if not handle then
-					Notifier.new({Title = "Totems", Content = "Selected totem not found (try Refresh)", Duration = 3, Icon = "rbxassetid://124426992222665"})
+					Notifier.new({Title = "Totems", Content = "Selected totem not found (try Refresh)", Duration = 3, Icon = "95448792622941"})
 					return
 				end
 				if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
@@ -716,7 +720,7 @@ return function(config)
 				local ws = game:GetService("Workspace")
 				local root = ws:FindFirstChild("Totems")
 				if not root then
-					Notifier.new({Title = "Totems", Content = "No Totems model found in workspace", Duration = 3, Icon = "rbxassetid://124426992222665"})
+					Notifier.new({Title = "Totems", Content = "No Totems model found in workspace", Duration = 3, Icon = "95448792622941"})
 					return
 				end
 				if not (player.Character and player.Character:FindFirstChild("HumanoidRootPart")) then
@@ -741,7 +745,7 @@ return function(config)
 					player.Character.HumanoidRootPart.CFrame = CFrame.new(nearestHandle.Position + Vector3.new(0, 3, 0))
 					-- Teleport performed (no notification as requested)
 				else
-					Notifier.new({Title = "Totems", Content = "No active totems found", Duration = 3, Icon = "rbxassetid://124426992222665"})
+					Notifier.new({Title = "Totems", Content = "No active totems found", Duration = 3, Icon = "95448792622941"})
 				end
 			end)
 		end,
@@ -762,7 +766,7 @@ return function(config)
 						Title = "Enchant Altar",
 						Content = "Teleported to Enchant Altar",
 						Duration = 2,
-						Icon = "rbxassetid://124426992222665"
+						Icon = "95448792622941"
 					})
 				end
 			end)
@@ -792,7 +796,7 @@ return function(config)
 						Title = "Enchant Altar",
 						Content = "Activated Level 200+ Altar - Using enchant stone",
 						Duration = 3,
-						Icon = "rbxassetid://124426992222665"
+						Icon = "95448792622941"
 					})
 				else
 					REActivateEnchantingAltar:FireServer()
@@ -800,7 +804,7 @@ return function(config)
 						Title = "Enchant Altar",
 						Content = "Activated Altar - Using enchant stone",
 						Duration = 3,
-						Icon = "rbxassetid://124426992222665"
+						Icon = "95448792622941"
 					})
 				end
 			end)
